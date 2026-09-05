@@ -211,14 +211,6 @@ private fun DirectionToggle(selected: Direction, onSelect: (Direction) -> Unit) 
     Surface(shape = RoundedCornerShape(18.dp), color = T.surfaceAlt, modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Segment(
-                label = "Money in",
-                icon = Icons.Rounded.NorthEast,
-                selected = selected == Direction.IN,
-                color = T.income,
-                container = T.incomeSoft,
-                modifier = Modifier.weight(1f),
-            ) { onSelect(Direction.IN) }
-            Segment(
                 label = "Money out",
                 icon = Icons.Rounded.SouthWest,
                 selected = selected == Direction.OUT,
@@ -226,6 +218,14 @@ private fun DirectionToggle(selected: Direction, onSelect: (Direction) -> Unit) 
                 container = T.expenseSoft,
                 modifier = Modifier.weight(1f),
             ) { onSelect(Direction.OUT) }
+            Segment(
+                label = "Money in",
+                icon = Icons.Rounded.NorthEast,
+                selected = selected == Direction.IN,
+                color = T.income,
+                container = T.incomeSoft,
+                modifier = Modifier.weight(1f),
+            ) { onSelect(Direction.IN) }
         }
     }
 }

@@ -140,13 +140,8 @@ fun DetailScreen(store: TallyStore, nav: Navigator, tallyId: String) {
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            FlowButton(
-                label = "Money in",
-                icon = Icons.Rounded.NorthEast,
-                color = T.income,
-                container = T.incomeSoft,
-                modifier = Modifier.weight(1f),
-            ) { nav.go(Route.Amount(tally.id, Direction.IN)) }
+            // Out sits on the left, and the toggle on the amount screen matches it — press
+            // the left button and the left segment is the one that lights up.
             FlowButton(
                 label = "Money out",
                 icon = Icons.Rounded.SouthWest,
@@ -154,6 +149,13 @@ fun DetailScreen(store: TallyStore, nav: Navigator, tallyId: String) {
                 container = T.expenseSoft,
                 modifier = Modifier.weight(1f),
             ) { nav.go(Route.Amount(tally.id, Direction.OUT)) }
+            FlowButton(
+                label = "Money in",
+                icon = Icons.Rounded.NorthEast,
+                color = T.income,
+                container = T.incomeSoft,
+                modifier = Modifier.weight(1f),
+            ) { nav.go(Route.Amount(tally.id, Direction.IN)) }
         }
     }
 
