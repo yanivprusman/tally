@@ -9,6 +9,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -18,6 +19,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -27,6 +31,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -119,9 +124,29 @@ fun App(api: TallyApi, nav: Navigator) {
                     hostState = host,
                     modifier = Modifier.fillMaxWidth(),
                 ) { data ->
-                    // Hand-built rather than the stock Snackbar: the message must never be
-                    // overlapped by the action, and the action is the whole point of it.
-                    Surface(shape = RoundedCornerShape(16.dp), color = T.surfaceAlt, modifier = Modifier.fillMaxWidth()) {
+                    val offsetX = remember { mutableStateOf(0f) }
+                    val alpha = (1f - (kotlin.math.abs(offsetX.value) / 400f).coerceIn(0f, 1f))
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = T.surfaceAlt,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .graphicsLayer {
+                                translationX = offsetX.value
+                                this.alpha = alpha
+                            }
+                            .draggable(
+                                orientation = Orientation.Horizontal,
+                                state = rememberDraggableState { delta -> offsetX.value += delta },
+                                onDragStopped = {
+                                    if (kotlin.math.abs(offsetX.value) > 150f) {
+                                        data.dismiss()
+                                    } else {
+                                        offsetX.value = 0f
+                                    }
+                                },
+                            ),
+                    ) {
                         Row(
                             Modifier.padding(start = 18.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
