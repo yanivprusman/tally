@@ -14,9 +14,12 @@ import kotlin.random.Random
  * The device holds a view, not the only copy. That is deliberate: an app whose
  * records live only in its own storage loses them to a wipe, a reinstall, a lost
  * phone — or to anyone with adb — and money records are exactly the kind of thing
- * that must survive all four. The server never destroys a row either; delete and
- * reset mark them, so undo is a fact about the data rather than a five-second
- * window in the UI.
+ * that must survive all four.
+ *
+ * Deleting, though, deletes. The database move protects against *accidents*; a
+ * delete the user chose is not one, and a row kept behind a flag is not a delete.
+ * Undo works because this class still holds the previous state in memory for as
+ * long as the snackbar is up, and puts it back with its original ids and times.
  *
  * Mutations apply locally first and are sent in the background, so tapping Add
  * feels instant on a slow link. If the send fails, the error is shown and the
@@ -35,9 +38,17 @@ class TallyStore(private val api: TallyApi, private val scope: CoroutineScope) {
     var error: String? by mutableStateOf(null)
         private set
 
-    /** What the server said would undo the last destructive act, plus the local
-     *  state to show immediately so Undo does not wait on a round trip. */
-    private var undo: Pair<Undo, List<Tally>>? = null
+    /**
+     * What the last destructive act removed. Held only in memory: once it is
+     * replaced, the delete is final everywhere.
+     *
+     * `removed` is exactly the entries that disappeared, not the whole tally —
+     * writing the whole tally back would also overwrite entries the delete never
+     * touched, and quietly undo anything changed elsewhere in the meantime.
+     */
+    private data class Undoable(val before: List<Tally>, val tally: Tally, val removed: List<Entry>)
+
+    private var undo: Undoable? = null
 
     init { refresh() }
 
@@ -63,7 +74,7 @@ class TallyStore(private val api: TallyApi, private val scope: CoroutineScope) {
     fun createTally(name: String, currency: String, accent: Int): String {
         val t = Tally(id = newId(), name = name.trim(), currency = currency, accent = accent, createdAt = now())
         tallies = tallies + t
-        push { api.createTally(t.id, t.name, t.currency, t.accent) }
+        push { api.createTally(t.id, t.name, t.currency, t.accent, t.createdAt) }
         return t.id
     }
 
@@ -75,14 +86,16 @@ class TallyStore(private val api: TallyApi, private val scope: CoroutineScope) {
 
     fun resetTally(id: String) {
         val before = tallies
+        val t = tally(id) ?: return
         tallies = tallies.map { if (it.id == id) it.copy(entries = emptyList()) else it }
-        destructive(before) { api.resetTally(id) }
+        destructive(before, t, t.entries) { api.resetTally(id) }
     }
 
     fun deleteTally(id: String) {
         val before = tallies
+        val t = tally(id) ?: return
         tallies = tallies.filterNot { it.id == id }
-        destructive(before) { api.deleteTally(id) }
+        destructive(before, t, t.entries) { api.deleteTally(id) }
     }
 
     // ---- entries ----------------------------------------------------------------
@@ -90,7 +103,7 @@ class TallyStore(private val api: TallyApi, private val scope: CoroutineScope) {
     fun addEntry(tallyId: String, direction: Direction, amount: Long, note: String, category: String) {
         val e = Entry(id = newId(), direction = direction, amount = amount, note = note.trim(), category = category, at = now())
         tallies = tallies.map { if (it.id == tallyId) it.copy(entries = it.entries + e) else it }
-        push { api.addEntry(tallyId, e.id, e.direction, e.amount, e.note, e.category) }
+        push { api.addEntry(tallyId, e.id, e.direction, e.amount, e.note, e.category, e.at) }
     }
 
     fun updateEntry(tallyId: String, entryId: String, direction: Direction, amount: Long, note: String, category: String) {
@@ -106,21 +119,25 @@ class TallyStore(private val api: TallyApi, private val scope: CoroutineScope) {
 
     fun deleteEntry(tallyId: String, entryId: String) {
         val before = tallies
-        tallies = tallies.map { t ->
-            if (t.id != tallyId) t else t.copy(entries = t.entries.filterNot { it.id == entryId })
+        val t = tally(tallyId) ?: return
+        val gone = t.entries.filter { it.id == entryId }
+        tallies = tallies.map { x ->
+            if (x.id != tallyId) x else x.copy(entries = x.entries.filterNot { it.id == entryId })
         }
-        destructive(before) { api.deleteEntry(entryId) }
+        destructive(before, t, gone) { api.deleteEntry(entryId) }
     }
 
-    /** Puts back what the last reset or delete took away. */
+    /** Puts back what the last reset or delete took away, by writing it again. */
     fun undoLast() {
-        val (token, before) = undo ?: return
+        val u = undo ?: return
         undo = null
-        tallies = before                    // instant; the server catches up below
+        tallies = u.before                  // instant; the server catches up below
         scope.launch {
-            val e = api.restore(token)
-            if (e != null) error = e
-            refresh()
+            val e = api.saveTally(u.tally.copy(entries = u.removed))
+            if (e != null) {
+                error = e
+                refresh()
+            }
         }
     }
 
@@ -137,16 +154,21 @@ class TallyStore(private val api: TallyApi, private val scope: CoroutineScope) {
         }
     }
 
-    /** A change the user can take back: on success keep the undo token, on failure
-     *  put the local state straight back. */
-    private fun destructive(before: List<Tally>, call: suspend () -> TallyApi.Result) {
+    /** A change the user can take back: on success remember what it replaced, on
+     *  failure put the local state straight back. */
+    private fun destructive(
+        before: List<Tally>,
+        tally: Tally,
+        removed: List<Entry>,
+        call: suspend () -> String?,
+    ) {
         scope.launch {
-            val r = call()
-            if (r.error != null) {
-                error = r.error
+            val e = call()
+            if (e != null) {
+                error = e
                 tallies = before
-            } else if (r.undo != null) {
-                undo = r.undo to before
+            } else {
+                undo = Undoable(before, tally, removed)
             }
         }
     }

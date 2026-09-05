@@ -10,8 +10,8 @@ const points = [
     body: "Money in or money out, an amount on the app's own keypad, and what it was for. That is the whole interaction.",
   },
   {
-    title: "Nothing is ever really deleted",
-    body: "Reset and delete mark rows rather than removing them, so a tally can always come back — and a wipe of the phone costs nothing, because the records were never only there.",
+    title: "Delete means delete",
+    body: "Reset and delete remove the rows. Undo puts back exactly what was taken while the snackbar is up, and after that it is gone — the records are protected from accidents, not from you.",
   },
 ];
 

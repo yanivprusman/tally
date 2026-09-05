@@ -22,5 +22,5 @@ export const PATCH = guarded(async (request, ctx) => {
 export const DELETE = guarded(async (_request, ctx) => {
   const { id } = await ctx.params;
   await deleteEntry(id);
-  return Response.json({ ok: true, undo: { kind: "entry", id } });
+  return Response.json({ ok: true });
 });

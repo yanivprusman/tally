@@ -14,10 +14,15 @@ a lost phone — or to anyone with `adb` — and money records must survive all 
 `adb shell pm clear com.automatelinux.tally.dev` removes every byte the app holds locally
 and the tallies are still there on next launch.
 
-**Nothing is ever hard-deleted.** Reset and delete set `deleted_at`; the reset also stamps
-a `reset_batch` so undoing one reset cannot resurrect entries the user had deleted
-individually beforehand. No query in `lib/tallies.ts` issues a `DELETE`. Undo is therefore
-a fact about the data, not a five-second window in the UI.
+**A delete is a real `DELETE`.** Moving the records off the phone protects them from
+*accidents* — a wipe, a reinstall, a stray `adb` command. A delete the user chose is not an
+accident, and a row kept behind a flag is not a delete. Deleting a tally cascades to its
+entries.
+
+**Undo still works**, because the app holds what it removed in memory for as long as the
+snackbar is up and writes it back — the same entry ids, the same timestamps, and *only* the
+rows that actually disappeared, so an undo cannot overwrite anything the delete never
+touched. Once that snackbar is gone, so is the data.
 
 **The trade-off, stated plainly:** the app needs to reach the backend. Off the VPN it shows
 "No connection — is the VPN up?" and refuses rather than pretending to save. There is no
@@ -30,7 +35,7 @@ answers to "how much did I spend".
 | :--- | :--- |
 | `db/schema.sql` | The two tables. DDL only — no rows are ever committed. |
 | `lib/db.ts` | mysql2 pool against the system MySQL (3306), same as veggieBox/lawSuits. |
-| `lib/tallies.ts` | Every query, each filtered on `deleted_at IS NULL`. |
+| `lib/tallies.ts` | Every query. Times are UTC end to end — see below. |
 | `lib/auth.ts` | The single bearer-token guard. A missing token refuses everything. |
 | `app/api/` | The REST surface the phone talks to. |
 | `mobile/shared/src/commonMain/` | Every screen, plus `data/TallyApi.kt`. Compose Multiplatform, so iOS-ready. |
@@ -38,6 +43,10 @@ answers to "how much did I spend".
 
 Amounts are minor units (agorot) everywhere — a running balance must never accumulate
 float error.
+
+**The client owns the clock.** Nothing relies on `CURRENT_TIMESTAMP`: MySQL writes column
+defaults in the *server's* zone (IDT here), which read back as UTC put every entry three
+hours in the future. Every write passes an explicit UTC string instead.
 
 ## Auth
 

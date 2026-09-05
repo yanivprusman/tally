@@ -17,9 +17,9 @@ export const PATCH = guarded(async (request, ctx) => {
   return Response.json({ ok: true });
 });
 
-/** Soft: the rows stay, so this is undoable for as long as anyone wants it to be. */
+/** Gone, along with its entries. Undo is the client POSTing it back. */
 export const DELETE = guarded(async (_request, ctx) => {
   const { id } = await ctx.params;
   await deleteTally(id);
-  return Response.json({ ok: true, undo: { kind: "tally", id } });
+  return Response.json({ ok: true });
 });

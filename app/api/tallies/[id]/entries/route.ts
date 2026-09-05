@@ -19,6 +19,9 @@ export const POST = guarded(async (request, ctx) => {
     amount: Math.round(amount),
     note: String(b.note ?? ""),
     category: String(b.category ?? "other"),
+    // The client owns the clock: it knows when the user tapped Add, and relying on
+    // the database's own clock put entries in the wrong timezone.
+    at: Number(b.at) || Date.now(),
   });
   return Response.json({ ok: true });
 });

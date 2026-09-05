@@ -1,10 +1,11 @@
 -- tally schema (system MySQL, database `tally`).
 --
--- Nothing here is ever hard-deleted. Reset and delete set `deleted_at`, so the
--- rows survive both the user changing their mind and anyone — a person or an
--- agent — wiping the phone. That is the point of the app living in the database
--- rather than in the phone's own storage: the device holds a view, not the only
--- copy.
+-- The records live here rather than in the phone's own storage: the device holds a
+-- view, not the only copy, so a wipe or a reinstall costs nothing.
+--
+-- A delete is a real DELETE. Undo is the client re-creating what it still holds in
+-- memory for the length of the snackbar — not a row lingering with a flag on it.
+-- Deleting a tally cascades to its entries.
 
 SET NAMES utf8mb4;
 
@@ -15,9 +16,7 @@ CREATE TABLE IF NOT EXISTS tallies (
   currency   VARCHAR(8)   NOT NULL DEFAULT '₪',
   accent     TINYINT      NOT NULL DEFAULT 0,
   created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  deleted_at TIMESTAMP    NULL DEFAULT NULL,
-  KEY idx_live (deleted_at)
+  updated_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- One movement of money. Amounts are minor units (agorot/cents) — a running
@@ -30,11 +29,6 @@ CREATE TABLE IF NOT EXISTS entries (
   note       VARCHAR(255) NOT NULL DEFAULT '',
   category   VARCHAR(32)  NOT NULL DEFAULT 'other',
   at         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  deleted_at TIMESTAMP    NULL DEFAULT NULL,
-  -- Set when a reset cleared this entry, so one reset can be undone as a unit
-  -- without also resurrecting entries deleted one at a time beforehand.
-  reset_batch VARCHAR(40) NULL DEFAULT NULL,
-  KEY idx_tally (tally_id, deleted_at, at),
-  KEY idx_batch (reset_batch),
+  KEY idx_tally (tally_id, at),
   CONSTRAINT fk_entry_tally FOREIGN KEY (tally_id) REFERENCES tallies(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

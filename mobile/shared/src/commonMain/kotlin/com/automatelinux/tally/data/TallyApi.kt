@@ -23,13 +23,13 @@ data class TalliesResponse(
 )
 
 @Serializable
-data class Undo(val kind: String, val id: String)
+private data class Ack(val ok: Boolean = false, val error: String? = null)
 
 @Serializable
-private data class Ack(val ok: Boolean = false, val error: String? = null, val undo: Undo? = null)
-
-@Serializable
-private data class TallyBody(val id: String, val name: String, val currency: String, val accent: Int)
+private data class TallyBody(
+    val id: String, val name: String, val currency: String, val accent: Int,
+    val createdAt: Long = 0,
+)
 
 @Serializable
 private data class EntryBody(
@@ -38,6 +38,7 @@ private data class EntryBody(
     val amount: Long,
     val note: String,
     val category: String,
+    val at: Long = 0,
 )
 
 /**
@@ -60,48 +61,50 @@ class TallyApi(baseUrl: String, private val token: String) {
             .getOrElse { TalliesResponse(error = describe(r)) }
     }
 
-    suspend fun createTally(id: String, name: String, currency: String, accent: Int): String? =
-        send("POST", "/api/tallies", json.encodeToString(TallyBody.serializer(), TallyBody(id, name, currency, accent)))
+    suspend fun createTally(
+        id: String, name: String, currency: String, accent: Int, createdAt: Long,
+    ): String? = call(
+        "POST", "/api/tallies",
+        json.encodeToString(TallyBody.serializer(), TallyBody(id, name, currency, accent, createdAt)),
+    )
+
+    /** Undo. The whole tally goes back — original ids, original timestamps — because
+     *  a restored entry dated "now" would land under the wrong day heading. */
+    suspend fun saveTally(tally: Tally): String? =
+        call("POST", "/api/tallies", json.encodeToString(Tally.serializer(), tally))
 
     suspend fun updateTally(id: String, name: String, currency: String, accent: Int): String? =
-        send("PATCH", "/api/tallies/$id", json.encodeToString(TallyBody.serializer(), TallyBody(id, name, currency, accent)))
+        call("PATCH", "/api/tallies/$id",
+            json.encodeToString(TallyBody.serializer(), TallyBody(id, name, currency, accent)))
 
-    suspend fun deleteTally(id: String): Result = call("DELETE", "/api/tallies/$id", null)
+    suspend fun deleteTally(id: String): String? = call("DELETE", "/api/tallies/$id", null)
 
-    suspend fun resetTally(id: String): Result = call("POST", "/api/tallies/$id/reset", "{}")
+    suspend fun resetTally(id: String): String? = call("POST", "/api/tallies/$id/reset", "{}")
 
     suspend fun addEntry(
-        tallyId: String, id: String, direction: Direction, amount: Long, note: String, category: String,
-    ): String? = send(
+        tallyId: String, id: String, direction: Direction, amount: Long, note: String,
+        category: String, at: Long,
+    ): String? = call(
         "POST", "/api/tallies/$tallyId/entries",
-        json.encodeToString(EntryBody.serializer(), EntryBody(id, direction, amount, note, category)),
+        json.encodeToString(EntryBody.serializer(), EntryBody(id, direction, amount, note, category, at)),
     )
 
     suspend fun updateEntry(
         id: String, direction: Direction, amount: Long, note: String, category: String,
-    ): String? = send(
+    ): String? = call(
         "PATCH", "/api/entries/$id",
         json.encodeToString(EntryBody.serializer(), EntryBody(id, direction, amount, note, category)),
     )
 
-    suspend fun deleteEntry(id: String): Result = call("DELETE", "/api/entries/$id", null)
+    suspend fun deleteEntry(id: String): String? = call("DELETE", "/api/entries/$id", null)
 
-    suspend fun restore(undo: Undo): String? =
-        send("POST", "/api/restore", json.encodeToString(Undo.serializer(), undo))
-
-    /** An acknowledgement plus, for the destructive calls, what would undo it. */
-    data class Result(val error: String?, val undo: Undo?)
-
-    private suspend fun call(method: String, path: String, body: String?): Result {
-        if (!configured) return Result(NO_TOKEN, null)
+    /** Null means it worked; anything else is a sentence to put on screen. */
+    private suspend fun call(method: String, path: String, body: String?): String? {
+        if (!configured) return NO_TOKEN
         val r = httpRequest(method, "$base$path", token, body)
         val ack = runCatching { json.decodeFromString(Ack.serializer(), r.body) }.getOrNull()
-        if (ack?.ok == true) return Result(null, ack.undo)
-        return Result(ack?.error ?: describe(r), null)
+        return if (ack?.ok == true) null else ack?.error ?: describe(r)
     }
-
-    private suspend fun send(method: String, path: String, body: String?): String? =
-        call(method, path, body).error
 
     /** The status code alone is useless to someone holding a phone. */
     private fun describe(r: HttpResult): String = when (r.code) {
