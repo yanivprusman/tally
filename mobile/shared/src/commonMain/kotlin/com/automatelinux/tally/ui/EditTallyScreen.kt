@@ -166,7 +166,7 @@ fun EditTallyScreen(store: TallyStore, nav: Navigator, tallyId: String?) {
                         ) {
                             if (selected) {
                                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Icon(Icons.Rounded.Check, null, Modifier.size(20.dp), tint = Color(0xFF0B0F14))
+                                    Icon(Icons.Rounded.Check, null, Modifier.size(20.dp), tint = Color(0xFF1A1410))
                                 }
                             }
                         }

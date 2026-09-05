@@ -76,7 +76,11 @@ fun DetailScreen(store: TallyStore, nav: Navigator, tallyId: String) {
     Column(Modifier.fillMaxSize()) {
         ScreenHeader(
             title = tally.name,
-            subtitle = if (tally.entries.isEmpty()) "No entries yet" else "${tally.entries.size} entries",
+            subtitle = when (tally.entries.size) {
+                0 -> "No entries yet"
+                1 -> "1 entry"
+                else -> "${tally.entries.size} entries"
+            },
             onBack = { nav.back() },
         ) {
             Box {

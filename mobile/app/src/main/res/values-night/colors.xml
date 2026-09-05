@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Mirrors DarkPalette.bg in the Compose theme. -->
-    <color name="window_background">#0D1116</color>
+    <color name="window_background">#191512</color>
 </resources>

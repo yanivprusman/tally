@@ -204,7 +204,7 @@ fun AmountScreen(
  * that sits on top of them has to invert with them.
  */
 @Composable
-private fun onAccent(): Color = if (T.isDark) Color(0xFF0B0F14) else Color.White
+private fun onAccent(): Color = if (T.isDark) Color(0xFF1A1410) else Color.White
 
 @Composable
 private fun DirectionToggle(selected: Direction, onSelect: (Direction) -> Unit) {

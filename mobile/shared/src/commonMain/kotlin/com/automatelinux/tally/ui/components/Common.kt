@@ -257,7 +257,7 @@ private fun Key(modifier: Modifier, label: String, onClick: () -> Unit) {
 @Composable
 fun SectionLabel(text: String, modifier: Modifier = Modifier) {
     Text(
-        text.uppercase(),
+        text,
         style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
         color = T.textFaint,
         modifier = modifier,

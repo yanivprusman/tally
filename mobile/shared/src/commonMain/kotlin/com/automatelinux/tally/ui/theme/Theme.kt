@@ -15,9 +15,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
 /**
- * Tally looks like chalk marks on slate: quiet ink surfaces, a brass accent for anything
- * you can press, and exactly two loud colours reserved for the only thing that matters —
- * money coming in and money going out. Nothing else is allowed to be green or red.
+ * Warm paper and clay. Keeping a tally is a relaxed thing — you jot what you earned and
+ * what you spent — so nothing here is allowed to look like an alert. In particular
+ * **money out is terracotta, never red**: paying for dinner is not an error condition,
+ * and a screen half-covered in warning colour makes an easy habit feel like a reckoning.
+ * Money in is a sage green rather than a signal green, for the same reason.
  */
 @Immutable
 data class TallyColors(
@@ -38,39 +40,41 @@ data class TallyColors(
     val isDark: Boolean,
 )
 
+/** Dark is a warm brown-charcoal — lamplight, not a terminal. */
 private val DarkPalette = TallyColors(
-    bg = Color(0xFF0D1116),
-    surface = Color(0xFF161C24),
-    surfaceAlt = Color(0xFF1E2630),
-    line = Color(0xFF2A333F),
-    text = Color(0xFFE9EDF3),
-    textDim = Color(0xFF9AA7B8),
-    textFaint = Color(0xFF64717F),
-    brand = Color(0xFFF5B544),
-    onBrand = Color(0xFF231703),
-    brandSoft = Color(0xFF3A2C0E),
-    income = Color(0xFF3DD68C),
-    incomeSoft = Color(0xFF10321F),
-    expense = Color(0xFFFF7A8A),
-    expenseSoft = Color(0xFF3A1219),
+    bg = Color(0xFF191512),
+    surface = Color(0xFF231E19),
+    surfaceAlt = Color(0xFF2E2721),
+    line = Color(0xFF3B322A),
+    text = Color(0xFFF0E8DE),
+    textDim = Color(0xFFAC9F91),
+    textFaint = Color(0xFF8A7F72),
+    brand = Color(0xFFE8B571),
+    onBrand = Color(0xFF2A1D0C),
+    brandSoft = Color(0xFF3B2E1C),
+    income = Color(0xFF8FC79A),
+    incomeSoft = Color(0xFF25301F),
+    expense = Color(0xFFE39B7C),
+    expenseSoft = Color(0xFF36251C),
     isDark = true,
 )
 
+/** Light is warm paper, so white cards sit on it without glaring. */
 private val LightPalette = TallyColors(
-    bg = Color(0xFFF4F6F9),
-    surface = Color(0xFFFFFFFF),
-    surfaceAlt = Color(0xFFEDF1F6),
-    line = Color(0xFFDCE3EC),
-    text = Color(0xFF0D1116),
-    textDim = Color(0xFF5A6879),
-    textFaint = Color(0xFF8C99A8),
-    brand = Color(0xFFF0A81E),
-    onBrand = Color(0xFF241700),
-    brandSoft = Color(0xFFFDF0D6),
-    income = Color(0xFF0E9463),
-    incomeSoft = Color(0xFFDFF4EA),
-    expense = Color(0xFFD62D50),
-    expenseSoft = Color(0xFFFCE4E9),
+    bg = Color(0xFFFAF6F0),
+    surface = Color(0xFFFFFCF8),
+    surfaceAlt = Color(0xFFF1EADF),
+    line = Color(0xFFE5DACB),
+    text = Color(0xFF2E2A26),
+    textDim = Color(0xFF6E655C),
+    textFaint = Color(0xFF8C8073),
+    brand = Color(0xFFE0A458),
+    onBrand = Color(0xFF2E2216),
+    brandSoft = Color(0xFFFAEEDB),
+    income = Color(0xFF38724E),
+    incomeSoft = Color(0xFFE6EFE3),
+    expense = Color(0xFFB35C3E),
+    expenseSoft = Color(0xFFF9E7DE),
     isDark = false,
 )
 
@@ -95,18 +99,19 @@ private val AppTypography = Typography(
     bodyLarge = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal),
     bodyMedium = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Normal),
     labelLarge = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.1.sp),
-    labelMedium = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.4.sp),
-    labelSmall = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.7.sp),
+    labelMedium = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.2.sp),
+    // Section labels are sentence case, not shouted small-caps — same reason as the palette.
+    labelSmall = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.1.sp),
 )
 
-/** The six stripes a tally can wear, so a list of them is scannable at a glance. */
+/** The six stripes a tally can wear — muted enough to sit quietly next to each other. */
 val AccentPalette = listOf(
-    Color(0xFFF5B544),
-    Color(0xFF2DD4BF),
-    Color(0xFF8B9DFF),
-    Color(0xFFFF8FA3),
-    Color(0xFFA3E635),
-    Color(0xFF56C2FF),
+    Color(0xFFE8B571),
+    Color(0xFF93B48B),
+    Color(0xFF8FA8C4),
+    Color(0xFFD89A8E),
+    Color(0xFFB8B072),
+    Color(0xFFA9A0C9),
 )
 
 fun accentAt(index: Int): Color = AccentPalette[((index % AccentPalette.size) + AccentPalette.size) % AccentPalette.size]
@@ -126,21 +131,21 @@ fun AppTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> U
             surfaceVariant = c.surfaceAlt, onSurfaceVariant = c.textDim,
             surfaceContainer = c.surface, surfaceContainerHigh = c.surfaceAlt,
             outline = c.line, outlineVariant = c.line,
-            error = c.expense, onError = Color(0xFF3A1219),
+            error = c.expense, onError = Color(0xFF36251C),
             inverseSurface = c.surfaceAlt, inverseOnSurface = c.text,
         )
     } else {
         lightColorScheme(
-            primary = Color(0xFF8A5A00), onPrimary = Color.White,
-            primaryContainer = c.brandSoft, onPrimaryContainer = Color(0xFF4A3000),
-            secondary = Color(0xFF8A5A00), onSecondary = Color.White,
+            primary = Color(0xFF8A5F2B), onPrimary = Color.White,
+            primaryContainer = c.brandSoft, onPrimaryContainer = Color(0xFF4A3418),
+            secondary = Color(0xFF8A5F2B), onSecondary = Color.White,
             background = c.bg, onBackground = c.text,
             surface = c.surface, onSurface = c.text,
             surfaceVariant = c.surfaceAlt, onSurfaceVariant = c.textDim,
             surfaceContainer = c.surface, surfaceContainerHigh = c.surfaceAlt,
             outline = c.line, outlineVariant = c.line,
             error = c.expense, onError = Color.White,
-            inverseSurface = Color(0xFF20262E), inverseOnSurface = Color(0xFFF1F4F8),
+            inverseSurface = Color(0xFF2E2A26), inverseOnSurface = Color(0xFFFAF6F0),
         )
     }
     CompositionLocalProvider(LocalTallyColors provides c) {
