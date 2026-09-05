@@ -50,3 +50,6 @@ mobile/feedback-lib/
 mobile/build-logic/
 mobile/local.properties
 mobile/.env
+
+# next build output, wherever it lands (a stray `next build` from mobile/ once made one)
+.next/
