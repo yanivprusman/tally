@@ -13,7 +13,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Snackbar
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -45,8 +50,6 @@ class Undoable(
     private val store: TallyStore,
     private val scope: kotlinx.coroutines.CoroutineScope,
 ) {
-    fun say(message: String) = scope.launch { host.showSnackbar(message, withDismissAction = true) }
-
     fun offerUndo(message: String) = scope.launch {
         val result = host.showSnackbar(message = message, actionLabel = "Undo")
         if (result == SnackbarResult.ActionPerformed) store.undoLast()
@@ -87,13 +90,26 @@ fun App(settings: Settings, nav: Navigator) {
                     hostState = host,
                     modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(12.dp),
                 ) { data ->
-                    Snackbar(
-                        snackbarData = data,
-                        containerColor = T.surfaceAlt,
-                        contentColor = T.text,
-                        actionColor = T.brand,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    // Hand-built rather than the stock Snackbar: the message must never be
+                    // overlapped by the action, and the action is the whole point of it.
+                    Surface(shape = RoundedCornerShape(16.dp), color = T.surfaceAlt, modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            Modifier.padding(start = 18.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                data.visuals.message,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = T.text,
+                                modifier = Modifier.weight(1f).padding(vertical = 6.dp),
+                            )
+                            data.visuals.actionLabel?.let { label ->
+                                TextButton(onClick = { data.performAction() }) {
+                                    Text(label, style = MaterialTheme.typography.labelLarge, color = T.brand)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

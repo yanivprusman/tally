@@ -67,8 +67,9 @@ fun formatDayHeader(epochMillis: Long): String {
 fun formatTime(epochMillis: Long): String {
     val t = kotlinx.datetime.Instant.fromEpochMilliseconds(epochMillis)
         .toLocalDateTime(TimeZone.currentSystemDefault())
+    val h = t.hour
     val m = t.minute
-    return "${t.hour}:" + (if (m < 10) "0$m" else "$m")
+    return (if (h < 10) "0$h" else "$h") + ":" + (if (m < 10) "0$m" else "$m")
 }
 
 /** "just now" / "3h ago" / "2 Sep" — the quiet line on a tally card. */

@@ -74,6 +74,7 @@ fun HomeScreen(store: TallyStore, nav: Navigator) {
                     1 -> "1 tally running"
                     else -> "${tallies.size} tallies running"
                 },
+                large = true,
             )
             if (tallies.isEmpty()) {
                 EmptyHome()
@@ -190,7 +191,8 @@ private fun TallyCard(
                 Flow(label = "out", value = formatMoney(tally.totalOut, tally.currency), color = T.expense)
                 Spacer(Modifier.weight(1f))
                 Text(
-                    if (tally.entries.isEmpty()) "empty" else "${tally.entries.size} · ${formatRelative(tally.lastActivity)}",
+                    if (tally.entries.isEmpty()) "empty"
+                    else "${tally.entries.size} ${if (tally.entries.size == 1) "entry" else "entries"} · ${formatRelative(tally.lastActivity)}",
                     style = MaterialTheme.typography.labelMedium,
                     color = T.textFaint,
                 )

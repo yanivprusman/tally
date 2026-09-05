@@ -1,34 +1,36 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# tally
 
-## Getting Started
+Money in, money out — across several independent tallies at once.
 
-First, run the development server:
+A tally is one thing you are keeping count of: a trip to the centre, a kitchen job, this
+week. Each one holds its own entries, its own currency and its own running balance, and
+they never mix. You can reset a tally back to zero and keep it, or delete it outright;
+both are undoable while the snackbar is up.
+
+## Where the code is
+
+| Path | What it is |
+| :--- | :--- |
+| `mobile/shared/src/commonMain/` | Every screen. Compose Multiplatform, so it is iOS-ready. |
+| `mobile/app/` | The Android host: a key-value store and the system back button. |
+| `app/` | The Next.js side — a description page plus the feedback-lib routes. |
+
+## State
+
+All of it lives on the device, in platform key-value storage, serialised as JSON by
+`TallyStore`. There is no account and no sync: a tally is written standing in a bus queue,
+so it must not need a network. Amounts are held in minor units (agorot) — a running
+balance must never accumulate float error.
+
+## Build and install
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd mobile && ./gradlew assembleDevDebug
+adb install -r app/build/outputs/apk/dev/debug/app-dev-debug.apk
+adb shell am start -n com.automatelinux.tally.dev/com.automatelinux.tally.MainActivity
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Always the **dev** flavor while developing — `assembleDevDebug`, never `assembleDebug`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The web side is managed by the daemon like any other app: `d startApp --app tally`
+(dev 3141, prod 3140).

@@ -25,18 +25,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Backspace
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.Backspace
 import androidx.compose.material.icons.rounded.CardGiftcard
 import androidx.compose.material.icons.rounded.Celebration
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.DirectionsBus
 import androidx.compose.material.icons.rounded.MoreHoriz
-import androidx.compose.material.icons.rounded.ReceiptLong
+import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.Sell
 import androidx.compose.material.icons.rounded.ShoppingBag
-import androidx.compose.material.icons.rounded.Undo
+import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.Weekend
 import androidx.compose.material.icons.rounded.Work
 import androidx.compose.material3.Icon
@@ -51,6 +51,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -70,6 +71,7 @@ fun ScreenHeader(
     title: String,
     onBack: (() -> Unit)? = null,
     subtitle: String? = null,
+    large: Boolean = false,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
     Row(
@@ -77,13 +79,19 @@ fun ScreenHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (onBack != null) {
-            RoundIconButton(Icons.Rounded.ArrowBack, "Back", onBack)
+            RoundIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", onBack)
             Spacer(Modifier.width(4.dp))
         } else {
             Spacer(Modifier.width(10.dp))
         }
         Column(Modifier.weight(1f)) {
-            Text(title, style = androidx.compose.material3.MaterialTheme.typography.titleLarge, color = T.text, maxLines = 1)
+            Text(
+                title,
+                style = if (large) androidx.compose.material3.MaterialTheme.typography.headlineMedium
+                        else androidx.compose.material3.MaterialTheme.typography.titleLarge,
+                color = T.text,
+                maxLines = 1,
+            )
             if (subtitle != null) {
                 Text(subtitle, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium, color = T.textDim, maxLines = 1)
             }
@@ -127,14 +135,14 @@ fun SplitBar(income: Long, expense: Long, modifier: Modifier = Modifier) {
 fun categoryIcon(id: String): ImageVector = when (id) {
     "work" -> Icons.Rounded.Work
     "sale" -> Icons.Rounded.Sell
-    "refund" -> Icons.Rounded.Undo
+    "refund" -> Icons.AutoMirrored.Rounded.Undo
     "gift" -> Icons.Rounded.CardGiftcard
     "food" -> Icons.Rounded.Restaurant
     "stay" -> Icons.Rounded.Weekend
     "travel" -> Icons.Rounded.DirectionsBus
     "shop" -> Icons.Rounded.ShoppingBag
     "fun" -> Icons.Rounded.Celebration
-    "bills" -> Icons.Rounded.ReceiptLong
+    "bills" -> Icons.AutoMirrored.Rounded.ReceiptLong
     else -> Icons.Rounded.MoreHoriz
 }
 
@@ -201,21 +209,21 @@ fun SwipeToDelete(onDelete: () -> Unit, content: @Composable () -> Unit) {
 @Composable
 fun Keypad(onDigit: (Char) -> Unit, onBackspace: () -> Unit, onClear: () -> Unit) {
     val rows = listOf("123", "456", "789")
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         rows.forEach { row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { ch -> Key(Modifier.weight(1f), ch.toString()) { onDigit(ch) } }
             }
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Key(Modifier.weight(1f), ".") { onDigit('.') }
             Key(Modifier.weight(1f), "0") { onDigit('0') }
             Surface(
-                color = Color.Transparent,
+                color = T.surfaceAlt,
                 shape = RoundedCornerShape(18.dp),
                 modifier = Modifier
                     .weight(1f)
-                    .height(58.dp)
+                    .height(56.dp)
                     .combinedClickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -224,7 +232,7 @@ fun Keypad(onDigit: (Char) -> Unit, onBackspace: () -> Unit, onClear: () -> Unit
                     ),
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Rounded.Backspace, "Backspace", Modifier.size(24.dp), tint = T.textDim)
+                    Icon(Icons.AutoMirrored.Rounded.Backspace, "Backspace", Modifier.size(24.dp), tint = T.textDim)
                 }
             }
         }
@@ -235,9 +243,9 @@ fun Keypad(onDigit: (Char) -> Unit, onBackspace: () -> Unit, onClear: () -> Unit
 private fun Key(modifier: Modifier, label: String, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        color = Color.Transparent,
+        color = T.surface,
         shape = RoundedCornerShape(18.dp),
-        modifier = modifier.height(58.dp),
+        modifier = modifier.height(56.dp),
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(label, style = Num.keypad, color = T.text, textAlign = TextAlign.Center)
@@ -270,6 +278,7 @@ fun TallyMarkArt(color: Color, modifier: Modifier = Modifier) {
                 .align(Alignment.Center)
                 .fillMaxWidth()
                 .height(7.dp)
+                .rotate(-13f)
                 .clip(RoundedCornerShape(4.dp))
                 .background(color),
         )

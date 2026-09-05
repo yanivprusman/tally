@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.russhwolf.settings.Settings
 import kotlinx.datetime.Clock
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlin.random.Random
 
@@ -24,7 +25,7 @@ class TallyStore(private val settings: Settings) {
     init {
         val raw = settings.getStringOrNull(KEY)
         tallies = if (raw.isNullOrBlank()) emptyList() else runCatching {
-            json.decodeFromString<List<Tally>>(raw)
+            json.decodeFromString(TalliesSerializer, raw)
         }.getOrDefault(emptyList())
     }
 
@@ -104,7 +105,7 @@ class TallyStore(private val settings: Settings) {
 
     private fun commit(next: List<Tally>) {
         tallies = next
-        settings.putString(KEY, json.encodeToString(next))
+        settings.putString(KEY, json.encodeToString(TalliesSerializer, next))
     }
 
     private fun now() = Clock.System.now().toEpochMilliseconds()
@@ -113,6 +114,7 @@ class TallyStore(private val settings: Settings) {
 
     private companion object {
         const val KEY = "tallies.v1"
+        val TalliesSerializer = ListSerializer(Tally.serializer())
         val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     }
 }

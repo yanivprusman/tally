@@ -181,7 +181,13 @@ fun DetailScreen(store: TallyStore, nav: Navigator, tallyId: String) {
 @Composable
 private fun Balance(net: Long, income: Long, expense: Long, currency: String) {
     Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
-        SectionLabel(if (net < 0) "Down by" else "Left over")
+        SectionLabel(
+            when {
+                net < 0 -> "Down by"
+                net > 0 -> "Left over"
+                else -> "Balance"
+            },
+        )
         Spacer(Modifier.height(6.dp))
         Text(
             formatSigned(net, currency),

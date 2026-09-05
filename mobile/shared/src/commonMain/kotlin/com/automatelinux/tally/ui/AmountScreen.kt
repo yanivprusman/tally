@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -198,9 +199,12 @@ fun AmountScreen(
     }
 }
 
-/** Both accents are vivid enough to carry near-black text in either theme. */
+/**
+ * The accents invert between themes — pastel on slate, saturated on paper — so the text
+ * that sits on top of them has to invert with them.
+ */
 @Composable
-private fun onAccent(): Color = Color(0xFF0B0F14)
+private fun onAccent(): Color = if (T.isDark) Color(0xFF0B0F14) else Color.White
 
 @Composable
 private fun DirectionToggle(selected: Direction, onSelect: (Direction) -> Unit) {
@@ -293,7 +297,7 @@ private fun CategoryChip(
         modifier = Modifier.height(42.dp),
     ) {
         Row(
-            Modifier.padding(horizontal = 14.dp).fillMaxSize(),
+            Modifier.padding(horizontal = 14.dp).fillMaxHeight(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(icon, null, Modifier.size(17.dp), tint = if (selected) accent else T.textDim)
