@@ -69,14 +69,21 @@ fun HomeScreen(store: TallyStore, nav: Navigator) {
         Column(Modifier.fillMaxSize()) {
             ScreenHeader(
                 title = "Tally",
-                subtitle = when (tallies.size) {
+                subtitle = when {
+                    store.loading -> "Loading…"
+                    else -> when (tallies.size) {
                     0 -> "Nothing running yet"
                     1 -> "1 tally running"
                     else -> "${tallies.size} tallies running"
+                    }
                 },
                 large = true,
             )
-            if (tallies.isEmpty()) {
+            if (store.loading) {
+                // An empty list before the first answer is not "no tallies" — saying so
+                // would invite the user to create a duplicate of one they already have.
+                LoadingHome()
+            } else if (tallies.isEmpty()) {
                 EmptyHome()
             } else {
                 LazyColumn(
@@ -229,6 +236,17 @@ fun TallyMenu(
         MenuRow("Rename & style", Icons.Rounded.Tune, T.text, onEdit)
         MenuRow("Reset to zero", Icons.Rounded.Restore, T.text, onReset)
         MenuRow("Delete tally", Icons.Rounded.DeleteOutline, T.expense, onDelete)
+    }
+}
+
+@Composable
+private fun LoadingHome() {
+    Column(
+        Modifier.fillMaxSize().padding(bottom = 80.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        TallyMarkArt(T.textFaint)
     }
 }
 

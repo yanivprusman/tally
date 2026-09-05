@@ -13,7 +13,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -30,6 +33,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.automatelinux.tally.data.TallyApi
 import com.automatelinux.tally.data.TallyStore
 import com.automatelinux.tally.ui.AmountScreen
 import com.automatelinux.tally.ui.DetailScreen
@@ -37,7 +41,6 @@ import com.automatelinux.tally.ui.EditTallyScreen
 import com.automatelinux.tally.ui.HomeScreen
 import com.automatelinux.tally.ui.theme.AppTheme
 import com.automatelinux.tally.ui.theme.T
-import com.russhwolf.settings.Settings
 import kotlinx.coroutines.launch
 
 /**
@@ -59,11 +62,11 @@ class Undoable(
 val LocalUndoable = staticCompositionLocalOf<Undoable> { error("No Undoable in scope") }
 
 @Composable
-fun App(settings: Settings, nav: Navigator) {
+fun App(api: TallyApi, nav: Navigator) {
     AppTheme {
-        val store = remember { TallyStore(settings) }
-        val host = remember { SnackbarHostState() }
         val scope = rememberCoroutineScope()
+        val store = remember { TallyStore(api, scope) }
+        val host = remember { SnackbarHostState() }
         val undoable = remember { Undoable(host, store, scope) }
 
         CompositionLocalProvider(LocalUndoable provides undoable) {
@@ -86,9 +89,35 @@ fun App(settings: Settings, nav: Navigator) {
                     }
                 }
 
+                Column(
+                    Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(12.dp),
+                ) {
+                    store.error?.let { message ->
+                        Surface(shape = RoundedCornerShape(16.dp), color = T.expenseSoft, modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                Modifier.padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    message,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = T.expense,
+                                    modifier = Modifier.weight(1f).padding(vertical = 6.dp),
+                                )
+                                TextButton(onClick = { store.refresh() }) {
+                                    Text("Retry", style = MaterialTheme.typography.labelLarge, color = T.expense)
+                                }
+                                TextButton(onClick = { store.dismissError() }) {
+                                    Text("Hide", style = MaterialTheme.typography.labelLarge, color = T.textDim)
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                    }
+
                 SnackbarHost(
                     hostState = host,
-                    modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
                 ) { data ->
                     // Hand-built rather than the stock Snackbar: the message must never be
                     // overlapped by the action, and the action is the whole point of it.
@@ -110,6 +139,7 @@ fun App(settings: Settings, nav: Navigator) {
                             }
                         }
                     }
+                }
                 }
             }
         }

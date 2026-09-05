@@ -10,8 +10,8 @@ const points = [
     body: "Money in or money out, an amount on the app's own keypad, and what it was for. That is the whole interaction.",
   },
   {
-    title: "Reset or delete, safely",
-    body: "Clear a tally back to zero and keep it, or remove it entirely. Both are one Undo away for as long as the snackbar is up.",
+    title: "Nothing is ever really deleted",
+    body: "Reset and delete mark rows rather than removing them, so a tally can always come back — and a wipe of the phone costs nothing, because the records were never only there.",
   },
 ];
 
@@ -46,9 +46,10 @@ export default function Home() {
         </dl>
 
         <p className="mt-14 text-sm leading-relaxed text-[#64717F]">
-          Everything a tally holds is stored on the phone itself. There is no account, nothing is
-          uploaded, and it all works with the radio off — which is the point, because a tally gets
-          written standing in a bus queue.
+          The records live in a database on the home network, reachable over the VPN — the phone
+          holds a view of them, not the only copy. Wiping the app, losing the handset or
+          reinstalling costs nothing. The trade is that the app needs to reach home to work, and
+          says so plainly when it cannot.
         </p>
       </div>
     </main>
