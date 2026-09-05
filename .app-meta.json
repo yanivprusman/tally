@@ -1,0 +1,7 @@
+{
+  "description": "Track money in and money out across several independent tallies at once — a trip, a job, a month. Each tally has its own entries, running balance, reset and delete.",
+  "icon": "Tally5",
+  "sharedLibs": [
+    "android-feedback-lib"
+  ]
+}
