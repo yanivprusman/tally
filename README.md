@@ -29,6 +29,19 @@ touched. Once that snackbar is gone, so is the data.
 local write queue, deliberately — a second copy that silently diverges is how you get two
 answers to "how much did I spend".
 
+## Duplicating a tally
+
+**Duplicate** (the ⋮ menu, on a card or inside a tally) makes a full copy — every entry,
+with its original amounts and timestamps — so the copy opens showing exactly the balance
+the original shows. That is the point: you fork a count in order to change it. Take the bag
+out of the copy and the number it lands on is the answer to "what would this have been if I
+hadn't paid for the bag", while the original stays untouched.
+
+The copy is an ordinary tally, not a view of another one. Tallies never mix, and a fork is
+no exception: nothing links the two afterwards, and deleting either leaves the other alone.
+Entry ids are new — two rows may never share one — but the times are not, so both tallies
+group under identical day headings and read line for line.
+
 ## Layout
 
 | Path | What it is |

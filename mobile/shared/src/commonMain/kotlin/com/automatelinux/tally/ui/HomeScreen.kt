@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Restore
@@ -95,6 +96,11 @@ fun HomeScreen(store: TallyStore, nav: Navigator) {
                             tally = tally,
                             onOpen = { nav.go(Route.Detail(tally.id)) },
                             onEdit = { nav.go(Route.EditTally(tally.id)) },
+                            // Straight into the copy: a fork is made in order to be
+                            // changed, and the change is the next thing the user does.
+                            onDuplicate = {
+                                store.duplicateTally(tally.id)?.let { nav.go(Route.Detail(it)) }
+                            },
                             onReset = { confirmReset = tally },
                             onDelete = { confirmDelete = tally },
                         )
@@ -144,6 +150,7 @@ private fun TallyCard(
     tally: Tally,
     onOpen: () -> Unit,
     onEdit: () -> Unit,
+    onDuplicate: () -> Unit,
     onReset: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -173,6 +180,7 @@ private fun TallyCard(
                         expanded = menuOpen,
                         onDismiss = { menuOpen = false },
                         onEdit = { menuOpen = false; onEdit() },
+                        onDuplicate = { menuOpen = false; onDuplicate() },
                         onReset = { menuOpen = false; onReset() },
                         onDelete = { menuOpen = false; onDelete() },
                     )
@@ -224,6 +232,7 @@ fun TallyMenu(
     expanded: Boolean,
     onDismiss: () -> Unit,
     onEdit: () -> Unit,
+    onDuplicate: () -> Unit,
     onReset: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -234,6 +243,7 @@ fun TallyMenu(
         shape = RoundedCornerShape(18.dp),
     ) {
         MenuRow("Rename & style", Icons.Rounded.Tune, T.text, onEdit)
+        MenuRow("Duplicate tally", Icons.Rounded.ContentCopy, T.text, onDuplicate)
         MenuRow("Reset to zero", Icons.Rounded.Restore, T.text, onReset)
         MenuRow("Delete tally", Icons.Rounded.DeleteOutline, T.expense, onDelete)
     }

@@ -78,6 +78,34 @@ class TallyStore(private val api: TallyApi, private val scope: CoroutineScope) {
         return t.id
     }
 
+    /**
+     * A copy of a tally, entries and all.
+     *
+     * The point is to fork a count and then change it — take the bag out, see what
+     * the total would have been — so the copy has to start out identical, and it has
+     * to be a separate tally rather than a view: the original must stay untouched
+     * while its fork is edited.
+     *
+     * Ids are new (no two rows may share one) but every `at` is the original, so the
+     * copy groups under exactly the same day headings as what it came from and the
+     * two balances are comparable line for line. `createdAt` is now, because that is
+     * when this tally started existing.
+     *
+     * Returns the new id, or null if the tally is already gone.
+     */
+    fun duplicateTally(id: String): String? {
+        val source = tally(id) ?: return null
+        val copy = source.copy(
+            id = newId(),
+            name = copyName(source.name),
+            createdAt = now(),
+            entries = source.entries.map { it.copy(id = newId()) },
+        )
+        tallies = tallies + copy
+        push { api.saveTally(copy) }
+        return copy.id
+    }
+
     fun updateTally(id: String, name: String, currency: String, accent: Int) {
         val clean = name.trim()
         tallies = tallies.map { if (it.id == id) it.copy(name = clean, currency = currency, accent = accent) else it }
@@ -173,7 +201,44 @@ class TallyStore(private val api: TallyApi, private val scope: CoroutineScope) {
         }
     }
 
+    /**
+     * "Trip" becomes "Trip copy", then "Trip copy 2" — a fork is usually one of
+     * several ("what if I skip the bag", "what if I skip the taxi"), so the second
+     * one must not arrive wearing the first one's name. Forking a fork drops the old
+     * suffix rather than stacking another on top of it.
+     */
+    private fun copyName(source: String): String {
+        val base = source.trim().replace(CopySuffix, "").trim().ifBlank { source.trim() }
+        val taken = tallies.map { it.name }.toSet()
+        var n = 1
+        while (true) {
+            val candidate = withSuffix(base, if (n == 1) "copy" else "copy $n")
+            if (candidate !in taken) return candidate
+            n++
+        }
+    }
+
+    /** The name field holds 40 characters, so a long name loses its tail, never its suffix. */
+    private fun withSuffix(base: String, suffix: String): String {
+        val room = MaxNameLength - suffix.length - 1
+        return (if (base.length <= room) base else base.take(room).trimEnd()) + " " + suffix
+    }
+
+    private var seq = 0
+
     private fun now() = Clock.System.now().toEpochMilliseconds()
 
-    private fun newId() = now().toString(36) + "-" + Random.nextInt(0, 1 shl 20).toString(36)
+    /**
+     * Unique by construction inside a run, not by luck. A duplicate mints one id per
+     * entry inside a single millisecond, and two entries that collided would be
+     * folded into one row by the upsert — a copy silently missing a line. The
+     * millisecond and the random tail keep it unique against earlier runs too.
+     */
+    private fun newId() =
+        now().toString(36) + "-" + (seq++).toString(36) + Random.nextInt(0, 1 shl 20).toString(36)
+
+    private companion object {
+        const val MaxNameLength = 40
+        val CopySuffix = Regex(" copy( \\d+)?$")
+    }
 }

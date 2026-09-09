@@ -89,6 +89,12 @@ fun DetailScreen(store: TallyStore, nav: Navigator, tallyId: String) {
                     expanded = menuOpen,
                     onDismiss = { menuOpen = false },
                     onEdit = { menuOpen = false; nav.go(Route.EditTally(tally.id)) },
+                    // Pushed, not replaced: back returns to the original, so the two
+                    // balances can be read one after the other.
+                    onDuplicate = {
+                        menuOpen = false
+                        store.duplicateTally(tally.id)?.let { nav.go(Route.Detail(it)) }
+                    },
                     onReset = { menuOpen = false; confirmReset = true },
                     onDelete = { menuOpen = false; confirmDelete = true },
                 )
