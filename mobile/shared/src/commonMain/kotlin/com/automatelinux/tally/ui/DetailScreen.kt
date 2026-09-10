@@ -218,9 +218,11 @@ private fun Balance(tally: Tally, onExVat: (Boolean) -> Unit) {
                 },
                 Modifier.weight(1f),
             )
-            // Nothing to switch between until something carries VAT, and a switch that
-            // changes nothing teaches the wrong thing about the numbers.
-            if (tally.hasVatEntries) VatViewSwitch(tally.exVat, onExVat)
+            // Always there. Which reading you are looking at is a fact about the screen,
+            // not a feature that arrives once an entry happens to carry VAT — and a tally
+            // whose entries are all VAT-free is exactly where you go looking for the
+            // switch to find out.
+            VatViewSwitch(tally.exVat, onExVat)
         }
         Spacer(Modifier.height(6.dp))
         Text(
