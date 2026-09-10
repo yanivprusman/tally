@@ -20,6 +20,8 @@ export type Entry = {
   note: string;
   category: string;
   at: number;
+  /** VAT sits inside `amount`. The amount itself is always what was paid. */
+  vatIncluded: boolean;
 };
 
 export type Tally = {
@@ -27,6 +29,8 @@ export type Tally = {
   name: string;
   currency: string;
   accent: number;
+  /** Show this tally with VAT taken back out of the entries that carry it. */
+  exVat: boolean;
   createdAt: number;
   entries: Entry[];
 };
@@ -40,14 +44,14 @@ const sqlTime = (epochMs: number) => new Date(epochMs).toISOString().slice(0, 19
 
 export async function listTallies(): Promise<Tally[]> {
   const tallies = await q<{
-    id: string; name: string; currency: string; accent: number; created_at: string;
-  }>(`SELECT id, name, currency, accent, created_at FROM tallies ORDER BY created_at`);
+    id: string; name: string; currency: string; accent: number; ex_vat: number; created_at: string;
+  }>(`SELECT id, name, currency, accent, ex_vat, created_at FROM tallies ORDER BY created_at`);
   if (tallies.length === 0) return [];
 
   const rows = await q<{
     id: string; tally_id: string; direction: Direction; amount: number;
-    note: string; category: string; at: string;
-  }>(`SELECT id, tally_id, direction, amount, note, category, at
+    note: string; category: string; at: string; vat_included: number;
+  }>(`SELECT id, tally_id, direction, amount, note, category, at, vat_included
         FROM entries WHERE tally_id IN (${tallies.map(() => "?").join(",")}) ORDER BY at`,
     tallies.map((t) => t.id));
 
@@ -61,6 +65,7 @@ export async function listTallies(): Promise<Tally[]> {
       note: r.note,
       category: r.category,
       at: ms(r.at),
+      vatIncluded: Boolean(r.vat_included),
     });
     byTally.set(r.tally_id, list);
   }
@@ -70,6 +75,7 @@ export async function listTallies(): Promise<Tally[]> {
     name: t.name,
     currency: t.currency,
     accent: Number(t.accent),
+    exVat: Boolean(t.ex_vat),
     createdAt: ms(t.created_at),
     entries: byTally.get(t.id) ?? [],
   }));
@@ -82,27 +88,28 @@ export async function listTallies(): Promise<Tally[]> {
  * today. Idempotent, so a retried undo is harmless.
  */
 export async function saveTally(
-  t: { id: string; name: string; currency: string; accent: number; createdAt: number },
+  t: { id: string; name: string; currency: string; accent: number; exVat: boolean; createdAt: number },
   entries?: Entry[],
 ) {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
     await conn.query(
-      `INSERT INTO tallies (id, name, currency, accent, created_at)
-            VALUES (?, ?, ?, ?, ?)
+      `INSERT INTO tallies (id, name, currency, accent, ex_vat, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE name = VALUES(name), currency = VALUES(currency),
-                               accent = VALUES(accent)`,
-      [t.id, t.name.slice(0, 64), t.currency, t.accent, sqlTime(t.createdAt)],
+                               accent = VALUES(accent), ex_vat = VALUES(ex_vat)`,
+      [t.id, t.name.slice(0, 64), t.currency, t.accent, t.exVat ? 1 : 0, sqlTime(t.createdAt)],
     );
     for (const e of entries ?? []) {
       await conn.query(
-        `INSERT INTO entries (id, tally_id, direction, amount, note, category, at)
-              VALUES (?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO entries (id, tally_id, direction, amount, note, category, at, vat_included)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE direction = VALUES(direction), amount = VALUES(amount),
-                                 note = VALUES(note), category = VALUES(category), at = VALUES(at)`,
+                                 note = VALUES(note), category = VALUES(category), at = VALUES(at),
+                                 vat_included = VALUES(vat_included)`,
         [e.id, t.id, e.direction, Math.round(e.amount), String(e.note).slice(0, 255),
-         e.category, sqlTime(e.at)],
+         e.category, sqlTime(e.at), e.vatIncluded ? 1 : 0],
       );
     }
     await conn.commit();
@@ -115,10 +122,10 @@ export async function saveTally(
 }
 
 export async function updateTally(id: string, t: {
-  name: string; currency: string; accent: number;
+  name: string; currency: string; accent: number; exVat: boolean;
 }) {
-  await exec(`UPDATE tallies SET name = ?, currency = ?, accent = ? WHERE id = ?`,
-    [t.name.slice(0, 64), t.currency, t.accent, id]);
+  await exec(`UPDATE tallies SET name = ?, currency = ?, accent = ?, ex_vat = ? WHERE id = ?`,
+    [t.name.slice(0, 64), t.currency, t.accent, t.exVat ? 1 : 0, id]);
 }
 
 /** Gone. The foreign key takes its entries with it. */
@@ -132,21 +139,24 @@ export async function resetTally(id: string) {
 }
 
 export async function addEntry(tallyId: string, e: {
-  id: string; direction: Direction; amount: number; note: string; category: string; at: number;
+  id: string; direction: Direction; amount: number; note: string; category: string;
+  at: number; vatIncluded: boolean;
 }) {
   await exec(
-    `INSERT INTO entries (id, tally_id, direction, amount, note, category, at)
-          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [e.id, tallyId, e.direction, e.amount, e.note.slice(0, 255), e.category, sqlTime(e.at)],
+    `INSERT INTO entries (id, tally_id, direction, amount, note, category, at, vat_included)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [e.id, tallyId, e.direction, e.amount, e.note.slice(0, 255), e.category, sqlTime(e.at),
+     e.vatIncluded ? 1 : 0],
   );
 }
 
 export async function updateEntry(id: string, e: {
-  direction: Direction; amount: number; note: string; category: string;
+  direction: Direction; amount: number; note: string; category: string; vatIncluded: boolean;
 }) {
   await exec(
-    `UPDATE entries SET direction = ?, amount = ?, note = ?, category = ? WHERE id = ?`,
-    [e.direction, e.amount, e.note.slice(0, 255), e.category, id],
+    `UPDATE entries SET direction = ?, amount = ?, note = ?, category = ?, vat_included = ?
+      WHERE id = ?`,
+    [e.direction, e.amount, e.note.slice(0, 255), e.category, e.vatIncluded ? 1 : 0, id],
   );
 }
 

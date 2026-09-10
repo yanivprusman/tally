@@ -18,6 +18,8 @@ data class Entry(
     val note: String = "",
     val category: String = "other",
     val at: Long,
+    /** VAT sits inside `amount`. What was paid is what is stored, either way — see Vat.kt. */
+    val vatIncluded: Boolean = false,
 )
 
 /**
@@ -30,13 +32,30 @@ data class Tally(
     val name: String,
     val currency: String = "₪",
     val accent: Int = 0,
+    /** Show the amounts with VAT taken back out of the entries that carry it. */
+    val exVat: Boolean = false,
     val createdAt: Long,
     val entries: List<Entry> = emptyList(),
 ) {
-    val totalIn: Long get() = entries.sumOf { if (it.direction == Direction.IN) it.amount else 0L }
-    val totalOut: Long get() = entries.sumOf { if (it.direction == Direction.OUT) it.amount else 0L }
+    // Every total goes through the current view, so the switch moves the balance, the
+    // day headings and the tally card together — there is no second, "real" number
+    // hiding behind the one on screen.
+    val totalIn: Long get() = sum(Direction.IN)
+    val totalOut: Long get() = sum(Direction.OUT)
     val net: Long get() = totalIn - totalOut
     val lastActivity: Long get() = entries.maxOfOrNull { it.at } ?: createdAt
+
+    /** The VAT this view took out, per side: money you owe on what came in, money you
+     *  can claim back on what went out. Summing the two together would be meaningless. */
+    val vatIn: Long get() = vat(Direction.IN)
+    val vatOut: Long get() = vat(Direction.OUT)
+    val hasVatEntries: Boolean get() = entries.any { it.vatIncluded }
+
+    private fun sum(d: Direction) =
+        entries.sumOf { if (it.direction == d) it.shownAmount(exVat) else 0L }
+
+    private fun vat(d: Direction) =
+        entries.sumOf { if (it.direction == d && it.vatIncluded) vatOf(it.amount) else 0L }
 }
 
 /** A labelled bucket offered on the amount screen. Free text always wins over the label. */

@@ -26,6 +26,7 @@ export const POST = guarded(async (request) => {
       name,
       currency: String(b.currency ?? "₪"),
       accent: Number(b.accent ?? 0),
+      exVat: Boolean(b.exVat),
       createdAt: Number(b.createdAt) || Date.now(),
     },
     entries,

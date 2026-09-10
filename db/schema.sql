@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS tallies (
   name       VARCHAR(64)  NOT NULL,                   -- entry can be made before a round trip
   currency   VARCHAR(8)   NOT NULL DEFAULT '₪',
   accent     TINYINT      NOT NULL DEFAULT 0,
+  ex_vat     TINYINT      NOT NULL DEFAULT 0,       -- show this tally without VAT
   created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -28,7 +29,29 @@ CREATE TABLE IF NOT EXISTS entries (
   amount     BIGINT       NOT NULL,
   note       VARCHAR(255) NOT NULL DEFAULT '',
   category   VARCHAR(32)  NOT NULL DEFAULT 'other',
+  vat_included TINYINT    NOT NULL DEFAULT 0,       -- VAT sits inside `amount`
   at         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_tally (tally_id, at),
   CONSTRAINT fk_entry_tally FOREIGN KEY (tally_id) REFERENCES tallies(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Added after the first release. MySQL has no ADD COLUMN IF NOT EXISTS, and this file
+-- has to stay re-runnable, so each one is guarded by the catalogue.
+--
+-- `amount` is always what was written down — what was actually paid. `vat_included`
+-- says whether VAT is sitting inside that number, and `ex_vat` says whether this tally
+-- is currently shown with it taken back out. Neither ever changes an amount: the
+-- ex-VAT figure is derived at display time, so the record stays the receipt.
+SET @sql := (SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE entries ADD COLUMN vat_included TINYINT NOT NULL DEFAULT 0 AFTER category',
+    'DO 0')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'entries' AND COLUMN_NAME = 'vat_included');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE tallies ADD COLUMN ex_vat TINYINT NOT NULL DEFAULT 0 AFTER accent',
+    'DO 0')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tallies' AND COLUMN_NAME = 'ex_vat');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

@@ -187,16 +187,28 @@ private fun TallyCard(
                 }
             }
             Spacer(Modifier.height(6.dp))
-            Text(
-                formatSigned(tally.net, tally.currency),
-                style = Num.large,
-                color = when {
-                    tally.net > 0 -> T.income
-                    tally.net < 0 -> T.expense
-                    else -> T.textDim
-                },
-                modifier = Modifier.padding(end = 10.dp),
-            )
+            Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(end = 10.dp)) {
+                Text(
+                    formatSigned(tally.net, tally.currency),
+                    style = Num.large,
+                    color = when {
+                        tally.net > 0 -> T.income
+                        tally.net < 0 -> T.expense
+                        else -> T.textDim
+                    },
+                )
+                // A card whose number has had VAT taken out of it has to say so, or it
+                // is simply a wrong total next to a right one.
+                if (tally.exVat) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "ex. VAT",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = T.textFaint,
+                        modifier = Modifier.padding(bottom = 4.dp),
+                    )
+                }
+            }
             Spacer(Modifier.height(14.dp))
             SplitBar(tally.totalIn, tally.totalOut, Modifier.padding(end = 10.dp))
             Spacer(Modifier.height(12.dp))

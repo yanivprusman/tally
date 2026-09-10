@@ -13,6 +13,7 @@ export const PATCH = guarded(async (request, ctx) => {
     name,
     currency: String(b.currency ?? "₪"),
     accent: Number(b.accent ?? 0),
+    exVat: Boolean(b.exVat),
   });
   return Response.json({ ok: true });
 });

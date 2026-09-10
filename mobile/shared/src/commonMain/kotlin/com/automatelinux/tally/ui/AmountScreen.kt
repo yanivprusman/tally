@@ -25,6 +25,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.NorthEast
+import androidx.compose.material.icons.rounded.Percent
 import androidx.compose.material.icons.rounded.SouthWest
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -49,6 +50,8 @@ import com.automatelinux.tally.data.Direction
 import com.automatelinux.tally.data.TallyStore
 import com.automatelinux.tally.data.categoriesFor
 import com.automatelinux.tally.data.formatAmount
+import com.automatelinux.tally.data.netOf
+import com.automatelinux.tally.data.vatOf
 import com.automatelinux.tally.ui.components.Keypad
 import com.automatelinux.tally.ui.components.ScreenHeader
 import com.automatelinux.tally.ui.components.SectionLabel
@@ -81,6 +84,12 @@ fun AmountScreen(
     var raw by remember { mutableStateOf(existing?.let { minorToRaw(it.amount) } ?: "") }
     var note by remember { mutableStateOf(existing?.note ?: "") }
     var category by remember { mutableStateOf(existing?.category ?: defaultCategory(existing?.direction ?: initialDirection)) }
+    // A new entry starts wherever the last one in this tally stood: a work tally is
+    // nearly all VAT, a trip is nearly none, and guessing the same way twice in a row
+    // is better than guessing the same way for everyone.
+    var vatIncluded by remember {
+        mutableStateOf(existing?.vatIncluded ?: (tally.entries.maxByOrNull { it.at }?.vatIncluded ?: false))
+    }
     var noteFocused by remember { mutableStateOf(false) }
     val focus = LocalFocusManager.current
 
@@ -120,7 +129,16 @@ fun AmountScreen(
                     color = if (raw.isEmpty()) T.textFaint else accent,
                 )
             }
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(14.dp))
+            VatRow(
+                on = vatIncluded,
+                amount = amount,
+                currency = tally.currency,
+                accent = accent,
+                accentSoft = accentSoft,
+                onToggle = { vatIncluded = !vatIncluded },
+            )
+            Spacer(Modifier.height(18.dp))
 
             NoteField(
                 value = note,
@@ -162,8 +180,10 @@ fun AmountScreen(
         Surface(
             onClick = {
                 if (amount > 0) {
-                    if (existing == null) store.addEntry(tally.id, direction, amount, note, category)
-                    else store.updateEntry(tally.id, existing.id, direction, amount, note, category)
+                    if (existing == null)
+                        store.addEntry(tally.id, direction, amount, note, category, vatIncluded)
+                    else
+                        store.updateEntry(tally.id, existing.id, direction, amount, note, category, vatIncluded)
                     nav.back()
                 }
             },
@@ -276,6 +296,58 @@ private fun NoteField(
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { onDone() }),
                 modifier = Modifier.fillMaxWidth().onFocusChanged { onFocusChanged(it.isFocused) },
+            )
+        }
+    }
+}
+
+/**
+ * Whether VAT is inside the amount just typed — and, while it is, what the amount
+ * splits into. The split is shown live rather than on a later screen because the
+ * moment to notice that a number is the gross one is while you are still looking at
+ * the receipt.
+ */
+@Composable
+private fun VatRow(
+    on: Boolean,
+    amount: Long,
+    currency: String,
+    accent: Color,
+    accentSoft: Color,
+    onToggle: () -> Unit,
+) {
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Surface(
+            onClick = onToggle,
+            shape = RoundedCornerShape(14.dp),
+            color = if (on) accentSoft else T.surface,
+            modifier = Modifier.height(38.dp),
+        ) {
+            Row(
+                Modifier.padding(horizontal = 14.dp).fillMaxHeight(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    if (on) Icons.Rounded.Check else Icons.Rounded.Percent,
+                    null,
+                    Modifier.size(15.dp),
+                    tint = if (on) accent else T.textDim,
+                )
+                Spacer(Modifier.width(7.dp))
+                Text(
+                    "Incl. VAT",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (on) accent else T.textDim,
+                )
+            }
+        }
+        if (on && amount > 0) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                currency + formatAmount(netOf(amount)) + " + " +
+                    currency + formatAmount(vatOf(amount)) + " VAT",
+                style = MaterialTheme.typography.labelMedium,
+                color = T.textFaint,
             )
         }
     }

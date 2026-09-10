@@ -28,6 +28,7 @@ private data class Ack(val ok: Boolean = false, val error: String? = null)
 @Serializable
 private data class TallyBody(
     val id: String, val name: String, val currency: String, val accent: Int,
+    val exVat: Boolean = false,
     val createdAt: Long = 0,
 )
 
@@ -38,6 +39,7 @@ private data class EntryBody(
     val amount: Long,
     val note: String,
     val category: String,
+    val vatIncluded: Boolean = false,
     val at: Long = 0,
 )
 
@@ -65,7 +67,10 @@ class TallyApi(baseUrl: String, private val token: String) {
         id: String, name: String, currency: String, accent: Int, createdAt: Long,
     ): String? = call(
         "POST", "/api/tallies",
-        json.encodeToString(TallyBody.serializer(), TallyBody(id, name, currency, accent, createdAt)),
+        json.encodeToString(
+            TallyBody.serializer(),
+            TallyBody(id, name, currency, accent, exVat = false, createdAt = createdAt),
+        ),
     )
 
     /** Undo. The whole tally goes back — original ids, original timestamps — because
@@ -73,9 +78,14 @@ class TallyApi(baseUrl: String, private val token: String) {
     suspend fun saveTally(tally: Tally): String? =
         call("POST", "/api/tallies", json.encodeToString(Tally.serializer(), tally))
 
-    suspend fun updateTally(id: String, name: String, currency: String, accent: Int): String? =
-        call("PATCH", "/api/tallies/$id",
-            json.encodeToString(TallyBody.serializer(), TallyBody(id, name, currency, accent)))
+    /** The whole presentation of a tally in one call: its name, its colour, its currency
+     *  and whether it is being shown without VAT. */
+    suspend fun updateTally(
+        id: String, name: String, currency: String, accent: Int, exVat: Boolean,
+    ): String? = call(
+        "PATCH", "/api/tallies/$id",
+        json.encodeToString(TallyBody.serializer(), TallyBody(id, name, currency, accent, exVat)),
+    )
 
     suspend fun deleteTally(id: String): String? = call("DELETE", "/api/tallies/$id", null)
 
@@ -83,17 +93,24 @@ class TallyApi(baseUrl: String, private val token: String) {
 
     suspend fun addEntry(
         tallyId: String, id: String, direction: Direction, amount: Long, note: String,
-        category: String, at: Long,
+        category: String, vatIncluded: Boolean, at: Long,
     ): String? = call(
         "POST", "/api/tallies/$tallyId/entries",
-        json.encodeToString(EntryBody.serializer(), EntryBody(id, direction, amount, note, category, at)),
+        json.encodeToString(
+            EntryBody.serializer(),
+            EntryBody(id, direction, amount, note, category, vatIncluded, at),
+        ),
     )
 
     suspend fun updateEntry(
         id: String, direction: Direction, amount: Long, note: String, category: String,
+        vatIncluded: Boolean,
     ): String? = call(
         "PATCH", "/api/entries/$id",
-        json.encodeToString(EntryBody.serializer(), EntryBody(id, direction, amount, note, category)),
+        json.encodeToString(
+            EntryBody.serializer(),
+            EntryBody(id, direction, amount, note, category, vatIncluded),
+        ),
     )
 
     suspend fun deleteEntry(id: String): String? = call("DELETE", "/api/entries/$id", null)

@@ -15,6 +15,7 @@ export const PATCH = guarded(async (request, ctx) => {
     amount: Math.round(amount),
     note: String(b.note ?? ""),
     category: String(b.category ?? "other"),
+    vatIncluded: Boolean(b.vatIncluded),
   });
   return Response.json({ ok: true });
 });

@@ -36,6 +36,12 @@ kotlin {
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.multiplatform.settings)
         }
+        // The VAT split is the one piece of arithmetic in this app that cannot be
+        // eyeballed: a rounding rule that is wrong by an agora is wrong in every total
+        // built on it, and nothing on screen would say so.
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+        }
     }
 }
 

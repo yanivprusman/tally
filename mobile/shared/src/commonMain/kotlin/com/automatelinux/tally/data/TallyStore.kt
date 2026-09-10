@@ -108,8 +108,23 @@ class TallyStore(private val api: TallyApi, private val scope: CoroutineScope) {
 
     fun updateTally(id: String, name: String, currency: String, accent: Int) {
         val clean = name.trim()
+        val current = tally(id) ?: return
         tallies = tallies.map { if (it.id == id) it.copy(name = clean, currency = currency, accent = accent) else it }
-        push { api.updateTally(id, clean, currency, accent) }
+        // The edit screen has no opinion about the VAT view, so it sends back the one
+        // the tally already has rather than silently resetting it.
+        push { api.updateTally(id, clean, currency, accent, current.exVat) }
+    }
+
+    /**
+     * Which way this tally is read: as written, or with VAT taken back out of the
+     * entries that carry it. It is a view rather than a record — but a view worth
+     * keeping, so it lives on the tally and is therefore the same on every device
+     * and still there after a reinstall.
+     */
+    fun setExVat(id: String, on: Boolean) {
+        val t = tally(id) ?: return
+        tallies = tallies.map { if (it.id == id) it.copy(exVat = on) else it }
+        push { api.updateTally(id, t.name, t.currency, t.accent, on) }
     }
 
     fun resetTally(id: String) {
@@ -128,21 +143,33 @@ class TallyStore(private val api: TallyApi, private val scope: CoroutineScope) {
 
     // ---- entries ----------------------------------------------------------------
 
-    fun addEntry(tallyId: String, direction: Direction, amount: Long, note: String, category: String) {
-        val e = Entry(id = newId(), direction = direction, amount = amount, note = note.trim(), category = category, at = now())
+    fun addEntry(
+        tallyId: String, direction: Direction, amount: Long, note: String, category: String,
+        vatIncluded: Boolean,
+    ) {
+        val e = Entry(
+            id = newId(), direction = direction, amount = amount, note = note.trim(),
+            category = category, at = now(), vatIncluded = vatIncluded,
+        )
         tallies = tallies.map { if (it.id == tallyId) it.copy(entries = it.entries + e) else it }
-        push { api.addEntry(tallyId, e.id, e.direction, e.amount, e.note, e.category, e.at) }
+        push { api.addEntry(tallyId, e.id, e.direction, e.amount, e.note, e.category, e.vatIncluded, e.at) }
     }
 
-    fun updateEntry(tallyId: String, entryId: String, direction: Direction, amount: Long, note: String, category: String) {
+    fun updateEntry(
+        tallyId: String, entryId: String, direction: Direction, amount: Long, note: String,
+        category: String, vatIncluded: Boolean,
+    ) {
         val clean = note.trim()
         tallies = tallies.map { t ->
             if (t.id != tallyId) t else t.copy(entries = t.entries.map { e ->
                 if (e.id != entryId) e
-                else e.copy(direction = direction, amount = amount, note = clean, category = category)
+                else e.copy(
+                    direction = direction, amount = amount, note = clean,
+                    category = category, vatIncluded = vatIncluded,
+                )
             })
         }
-        push { api.updateEntry(entryId, direction, amount, clean, category) }
+        push { api.updateEntry(entryId, direction, amount, clean, category, vatIncluded) }
     }
 
     fun deleteEntry(tallyId: String, entryId: String) {

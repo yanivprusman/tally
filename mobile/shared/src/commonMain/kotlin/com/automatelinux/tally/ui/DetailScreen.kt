@@ -42,6 +42,7 @@ import com.automatelinux.tally.Navigator
 import com.automatelinux.tally.Route
 import com.automatelinux.tally.data.Direction
 import com.automatelinux.tally.data.Entry
+import com.automatelinux.tally.data.Tally
 import com.automatelinux.tally.data.TallyStore
 import com.automatelinux.tally.data.categoryLabel
 import com.automatelinux.tally.data.dayKey
@@ -49,6 +50,7 @@ import com.automatelinux.tally.data.formatDayHeader
 import com.automatelinux.tally.data.formatMoney
 import com.automatelinux.tally.data.formatSigned
 import com.automatelinux.tally.data.formatTime
+import com.automatelinux.tally.data.shownAmount
 import com.automatelinux.tally.ui.components.ConfirmDialog
 import com.automatelinux.tally.ui.components.RoundIconButton
 import com.automatelinux.tally.ui.components.ScreenHeader
@@ -106,7 +108,7 @@ fun DetailScreen(store: TallyStore, nav: Navigator, tallyId: String) {
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
         ) {
             item {
-                Balance(tally.net, tally.totalIn, tally.totalOut, tally.currency)
+                Balance(tally) { store.setExVat(tally.id, it) }
                 Spacer(Modifier.height(22.dp))
             }
 
@@ -118,7 +120,10 @@ fun DetailScreen(store: TallyStore, nav: Navigator, tallyId: String) {
                     item(key = "h" + dayEntries.first().id) {
                         DayHeader(
                             label = formatDayHeader(dayEntries.first().at),
-                            net = dayEntries.sumOf { if (it.direction == Direction.IN) it.amount else -it.amount },
+                            net = dayEntries.sumOf {
+                                val shown = it.shownAmount(tally.exVat)
+                                if (it.direction == Direction.IN) shown else -shown
+                            },
                             currency = tally.currency,
                         )
                     }
@@ -128,7 +133,7 @@ fun DetailScreen(store: TallyStore, nav: Navigator, tallyId: String) {
                                 store.deleteEntry(tally.id, entry.id)
                                 undoable.offerUndo("Entry deleted")
                             }) {
-                                EntryRow(entry, tally.currency) {
+                                EntryRow(entry, tally.currency, tally.exVat) {
                                     nav.go(Route.Amount(tally.id, entry.direction, entry.id))
                                 }
                             }
@@ -189,17 +194,34 @@ fun DetailScreen(store: TallyStore, nav: Navigator, tallyId: String) {
     }
 }
 
-/** The number the screen exists for, then the two numbers it is made of. */
+/**
+ * The number the screen exists for, then the two numbers it is made of.
+ *
+ * Every figure here is the tally's own totals, which already answer to its VAT view —
+ * so the switch beside the label moves the balance, the bar, the two cards, the day
+ * headings and every row at once. There is no second number hiding behind this one.
+ */
 @Composable
-private fun Balance(net: Long, income: Long, expense: Long, currency: String) {
+private fun Balance(tally: Tally, onExVat: (Boolean) -> Unit) {
+    val net = tally.net
+    val income = tally.totalIn
+    val expense = tally.totalOut
+    val currency = tally.currency
+
     Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
-        SectionLabel(
-            when {
-                net < 0 -> "Down by"
-                net > 0 -> "Left over"
-                else -> "Balance"
-            },
-        )
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            SectionLabel(
+                when {
+                    net < 0 -> "Down by"
+                    net > 0 -> "Left over"
+                    else -> "Balance"
+                },
+                Modifier.weight(1f),
+            )
+            // Nothing to switch between until something carries VAT, and a switch that
+            // changes nothing teaches the wrong thing about the numbers.
+            if (tally.hasVatEntries) VatViewSwitch(tally.exVat, onExVat)
+        }
         Spacer(Modifier.height(6.dp))
         Text(
             formatSigned(net, currency),
@@ -214,14 +236,55 @@ private fun Balance(net: Long, income: Long, expense: Long, currency: String) {
         SplitBar(income, expense)
         Spacer(Modifier.height(14.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Totals("Came in", formatMoney(income, currency), T.income, Modifier.weight(1f))
-            Totals("Went out", formatMoney(expense, currency), T.expense, Modifier.weight(1f))
+            Totals(
+                "Came in", formatMoney(income, currency), T.income,
+                vatCaption(tally.vatIn, tally.exVat, currency), Modifier.weight(1f),
+            )
+            Totals(
+                "Went out", formatMoney(expense, currency), T.expense,
+                vatCaption(tally.vatOut, tally.exVat, currency), Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+/** The VAT this side carries, said from the point of view of what is on screen: in the
+ *  ex-VAT reading it is what was taken off, in the written one it is what is inside. */
+private fun vatCaption(vat: Long, exVat: Boolean, currency: String): String? = when {
+    vat <= 0L -> null
+    exVat -> "+ " + formatMoney(vat, currency) + " VAT"
+    else -> formatMoney(vat, currency) + " VAT inside"
+}
+
+/** Two words, both always visible, so the reading is stated rather than remembered. */
+@Composable
+private fun VatViewSwitch(exVat: Boolean, onExVat: (Boolean) -> Unit) {
+    Surface(shape = RoundedCornerShape(12.dp), color = T.surface) {
+        Row(Modifier.padding(3.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            VatViewSegment("Incl. VAT", !exVat) { onExVat(false) }
+            VatViewSegment("Ex. VAT", exVat) { onExVat(true) }
         }
     }
 }
 
 @Composable
-private fun Totals(label: String, value: String, color: Color, modifier: Modifier) {
+private fun VatViewSegment(label: String, selected: Boolean, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(10.dp),
+        color = if (selected) T.brandSoft else Color.Transparent,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (selected) T.brand else T.textFaint,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+        )
+    }
+}
+
+@Composable
+private fun Totals(label: String, value: String, color: Color, caption: String?, modifier: Modifier) {
     Surface(shape = RoundedCornerShape(18.dp), color = T.surface, modifier = modifier) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -231,6 +294,10 @@ private fun Totals(label: String, value: String, color: Color, modifier: Modifie
             }
             Spacer(Modifier.height(4.dp))
             Text(value, style = Num.medium, color = T.text)
+            if (caption != null) {
+                Spacer(Modifier.height(3.dp))
+                Text(caption, style = MaterialTheme.typography.labelSmall, color = T.textFaint, maxLines = 1)
+            }
         }
     }
 }
@@ -251,7 +318,7 @@ private fun DayHeader(label: String, net: Long, currency: String) {
 }
 
 @Composable
-private fun EntryRow(entry: Entry, currency: String, onClick: () -> Unit) {
+private fun EntryRow(entry: Entry, currency: String, exVat: Boolean, onClick: () -> Unit) {
     val income = entry.direction == Direction.IN
     val color = if (income) T.income else T.expense
     Surface(onClick = onClick, color = T.surface, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
@@ -275,8 +342,14 @@ private fun EntryRow(entry: Entry, currency: String, onClick: () -> Unit) {
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    if (entry.note.isBlank()) formatTime(entry.at)
-                    else categoryLabel(entry.category) + " · " + formatTime(entry.at),
+                    buildString {
+                        if (entry.note.isNotBlank()) append(categoryLabel(entry.category)).append(" · ")
+                        append(formatTime(entry.at))
+                        // Which rows carry VAT is worth knowing in both readings — in one
+                        // to see what is inside the number, in the other to see why this
+                        // row moved and its neighbour did not.
+                        if (entry.vatIncluded) append(if (exVat) " · ex. VAT" else " · incl. VAT")
+                    },
                     style = MaterialTheme.typography.labelMedium,
                     color = T.textFaint,
                     maxLines = 1,
@@ -284,7 +357,7 @@ private fun EntryRow(entry: Entry, currency: String, onClick: () -> Unit) {
             }
             Spacer(Modifier.width(10.dp))
             Text(
-                (if (income) "+" else "−") + formatMoney(entry.amount, currency),
+                (if (income) "+" else "−") + formatMoney(entry.shownAmount(exVat), currency),
                 style = Num.medium,
                 color = color,
             )
