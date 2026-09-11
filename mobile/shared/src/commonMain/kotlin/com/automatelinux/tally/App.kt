@@ -34,6 +34,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,6 +72,10 @@ fun App(api: TallyApi, nav: Navigator) {
     AppTheme {
         val scope = rememberCoroutineScope()
         val store = remember { TallyStore(api, scope) }
+        // Keeps each screen's saved state — in practice, where its list was scrolled to —
+        // so that stepping into an entry and back returns you to the row you tapped
+        // rather than to the top of the tally. See Route.stateKey.
+        val screenState = rememberSaveableStateHolder()
         val host = remember { SnackbarHostState() }
         val undoable = remember { Undoable(host, store, scope) }
 
@@ -86,11 +91,13 @@ fun App(api: TallyApi, nav: Navigator) {
                     },
                     label = "route",
                 ) { route ->
-                    when (route) {
-                        is Route.Home -> HomeScreen(store, nav)
-                        is Route.Detail -> DetailScreen(store, nav, route.tallyId)
-                        is Route.Amount -> AmountScreen(store, nav, route.tallyId, route.direction, route.entryId)
-                        is Route.EditTally -> EditTallyScreen(store, nav, route.tallyId)
+                    screenState.SaveableStateProvider(route.stateKey) {
+                        when (route) {
+                            is Route.Home -> HomeScreen(store, nav)
+                            is Route.Detail -> DetailScreen(store, nav, route.tallyId)
+                            is Route.Amount -> AmountScreen(store, nav, route.tallyId, route.direction, route.entryId)
+                            is Route.EditTally -> EditTallyScreen(store, nav, route.tallyId)
+                        }
                     }
                 }
 
