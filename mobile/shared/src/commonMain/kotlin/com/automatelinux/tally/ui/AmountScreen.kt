@@ -2,6 +2,8 @@ package com.automatelinux.tally.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,10 +11,12 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -32,6 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,6 +47,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -93,6 +99,16 @@ fun AmountScreen(
     var noteFocused by remember { mutableStateOf(false) }
     val focus = LocalFocusManager.current
 
+    // The pad hides while the note has focus, so the note must not keep focus once the
+    // keyboard has gone. Closing the keyboard with back (or its own hide key) leaves
+    // the field focused — and left the pad hidden with nothing on screen to bring it
+    // back, so the amount could no longer be changed. Only the keyboard's Done key
+    // used to clear it.
+    val keyboardUp = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    LaunchedEffect(keyboardUp) {
+        if (!keyboardUp && noteFocused) focus.clearFocus()
+    }
+
     val accent = if (direction == Direction.IN) T.income else T.expense
     val accentSoft = if (direction == Direction.IN) T.incomeSoft else T.expenseSoft
     val amount = rawToMinor(raw)
@@ -111,8 +127,14 @@ fun AmountScreen(
             }
 
             Spacer(Modifier.height(26.dp))
+            // Tapping the amount is how you get back to changing it from the note: it
+            // puts the keyboard away and the pad back.
             Row(
-                Modifier.fillMaxWidth(),
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                        focus.clearFocus()
+                    },
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.Bottom,
             ) {
