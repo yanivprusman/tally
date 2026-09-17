@@ -65,6 +65,13 @@ import com.automatelinux.tally.ui.theme.T
 @Composable
 fun DetailScreen(store: TallyStore, nav: Navigator, tallyId: String) {
     val tally = store.tally(tallyId)
+    if (tally == null && !store.loaded) {
+        // Reopened into this tally before the list has arrived — or off the VPN, where
+        // it has not arrived at all. Missing is not the same as deleted: wait, and let
+        // the error banner's Retry bring it in.
+        WaitingForTally(store.loading) { nav.back() }
+        return
+    }
     if (tally == null) {
         // The tally was deleted under us (undo of a create, say) — go back rather than crash.
         nav.popToHome()
@@ -401,5 +408,19 @@ private fun EmptyEntries() {
             color = T.textDim,
             textAlign = TextAlign.Center,
         )
+    }
+}
+
+@Composable
+private fun WaitingForTally(loading: Boolean, onBack: () -> Unit) {
+    Column(Modifier.fillMaxSize()) {
+        ScreenHeader(title = "", subtitle = if (loading) "Loading…" else null, onBack = onBack)
+        Column(
+            Modifier.fillMaxSize().padding(bottom = 80.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            TallyMarkArt(T.textFaint)
+        }
     }
 }

@@ -35,6 +35,14 @@ class TallyStore(private val api: TallyApi, private val scope: CoroutineScope) {
     var loading: Boolean by mutableStateOf(true)
         private set
 
+    /**
+     * True once the server has answered with the list at least once. Unlike `loading`,
+     * a failed first load leaves this false — so a tally the app reopened into, but has
+     * not been able to fetch yet, is still waiting rather than taken for deleted.
+     */
+    var loaded: Boolean by mutableStateOf(false)
+        private set
+
     var error: String? by mutableStateOf(null)
         private set
 
@@ -57,6 +65,7 @@ class TallyStore(private val api: TallyApi, private val scope: CoroutineScope) {
             val r = api.list()
             if (r.ok) {
                 tallies = r.tallies
+                loaded = true
                 error = null
             } else {
                 error = r.error ?: "Could not load your tallies"

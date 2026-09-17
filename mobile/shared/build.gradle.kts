@@ -41,6 +41,8 @@ kotlin {
         // built on it, and nothing on screen would say so.
         commonTest.dependencies {
             implementation(kotlin("test"))
+            // MapSettings: the navigator's memory of the open tally, without a phone.
+            implementation(libs.multiplatform.settings.test)
         }
     }
 }

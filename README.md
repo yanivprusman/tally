@@ -24,6 +24,12 @@ snackbar is up and writes it back — the same entry ids, the same timestamps, a
 rows that actually disappeared, so an undo cannot overwrite anything the delete never
 touched. Once that snackbar is gone, so is the data.
 
+**One thing is kept on the phone: which tally was open.** Close the app inside a tally and
+it opens back inside that tally, with the list one back-press away; close it on the list and
+it opens on the list. That is not a record — it is where this phone was — so a wipe costs one
+tap, not money. On the server it would put a network write (and an error banner off the VPN)
+behind every tap into a tally. Only the tally is restored, never an entry you were typing.
+
 **The trade-off, stated plainly:** the app needs to reach the backend. Off the VPN it shows
 "No connection — is the VPN up?" and refuses rather than pretending to save. There is no
 local write queue, deliberately — a second copy that silently diverges is how you get two

@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.automatelinux.tally.data.Direction
+import com.russhwolf.settings.Settings
 
 sealed interface Route {
     data object Home : Route
@@ -36,9 +37,22 @@ val Route.stateKey: String
  * A back stack, not a navigation library. Four screens do not need one, and owning the
  * stack here is what lets the Android back button and the on-screen back arrow be the
  * same single code path.
+ *
+ * It also remembers which tally you are in, so the app opens back inside it: a tally is
+ * something you keep adding to over days, and landing on the list each time costs a tap
+ * for the one you were already using. Leave to the list and the app opens on the list.
+ *
+ * That memory is on the phone, unlike everything the tallies hold. It is not a record —
+ * it is where this phone was — and losing it (a wipe, a reinstall) costs exactly that one
+ * tap. Keeping it on the server would put a network write, and an error banner whenever
+ * the VPN is down, behind every tap into a tally.
  */
-class Navigator {
-    private val stack = mutableStateListOf<Route>(Route.Home)
+class Navigator(private val settings: Settings) {
+    // Home stays underneath, so back from the reopened tally goes to the list rather
+    // than out of the app. Only the tally comes back — never an entry half-typed in it.
+    private val stack = mutableStateListOf<Route>(Route.Home).apply {
+        settings.getStringOrNull(OpenTallyKey)?.let { add(Route.Detail(it)) }
+    }
 
     val current: Route get() = stack.last()
 
@@ -49,12 +63,14 @@ class Navigator {
     fun go(route: Route) {
         forward = true
         stack.add(route)
+        rememberOpenTally()
     }
 
     /** Replaces the top of the stack — used when a newly created tally opens straight away. */
     fun replaceTop(route: Route) {
         forward = true
         stack[stack.lastIndex] = route
+        rememberOpenTally()
     }
 
     /** True if it handled the gesture; false means "there is nothing left, leave the app". */
@@ -62,11 +78,29 @@ class Navigator {
         if (stack.size <= 1) return false
         forward = false
         stack.removeAt(stack.lastIndex)
+        rememberOpenTally()
         return true
     }
 
     fun popToHome() {
         forward = false
         while (stack.size > 1) stack.removeAt(stack.lastIndex)
+        rememberOpenTally()
+    }
+
+    /**
+     * The innermost tally on the stack, not the top screen: adding an entry or renaming
+     * the tally happens on screens above it, and you are still in that tally throughout.
+     * Renaming from a card on the list never passed through a tally, so it is not one.
+     */
+    private fun rememberOpenTally() {
+        when (val open = stack.lastOrNull { it is Route.Detail }) {
+            is Route.Detail -> settings.putString(OpenTallyKey, open.tallyId)
+            else -> settings.remove(OpenTallyKey)
+        }
+    }
+
+    private companion object {
+        const val OpenTallyKey = "openTally"
     }
 }

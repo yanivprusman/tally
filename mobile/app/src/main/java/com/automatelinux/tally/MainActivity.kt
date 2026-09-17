@@ -6,6 +6,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.automatelinux.tally.data.TallyApi
+import com.russhwolf.settings.SharedPreferencesSettings
 
 /**
  * Thin Android host: all UI lives in the shared commonMain composables. Two things
@@ -22,7 +23,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val api = TallyApi(BuildConfig.API_BASE_URL, BuildConfig.API_TOKEN)
-        val nav = Navigator()
+        val nav = Navigator(SharedPreferencesSettings(getSharedPreferences("navigation", MODE_PRIVATE)))
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
