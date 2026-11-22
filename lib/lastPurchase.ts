@@ -240,9 +240,9 @@ async function check(id: string): Promise<void> {
 }
 
 /**
- * A press of the button. Looks at the card at once (about 15 s) and answers with the
- * result: either the purchase was added, or the server is now waiting for it. A second
- * press while one is waiting returns that wait rather than starting another.
+ * A press of the button. Starts looking at the card at once and answers immediately
+ * with the new wait; the phone follows it with GET. A second press while one is
+ * waiting returns that wait rather than starting another.
  */
 export async function requestLastPurchase(tallyId: string): Promise<Watch> {
   if (!(await q(`SELECT 1 FROM tallies WHERE id = ?`, [tallyId])).length) throw new Error("no such tally");
@@ -258,7 +258,10 @@ export async function requestLastPurchase(tallyId: string): Promise<Watch> {
     `INSERT INTO purchase_watches (id, tally_id, requested_at, status) VALUES (?, ?, ?, 'waiting')`,
     [id, tallyId, sqlTime(Date.now())],
   );
-  await check(id);
+  // The first look runs in the background too: it takes ~15 s (longer when Cal is slow),
+  // more than a phone on a bus should hold one request open for. The phone asks for the
+  // watch with GET and shows "looking" while `checks` is 0.
+  schedule(id, 0);
   return (await getWatch(id))!;
 }
 

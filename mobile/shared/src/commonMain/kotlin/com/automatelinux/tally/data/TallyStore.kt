@@ -205,6 +205,56 @@ class TallyStore(private val api: TallyApi, private val scope: CoroutineScope) {
         }
     }
 
+    // ---- add my last purchase ---------------------------------------------------
+
+    /**
+     * The newest press of "add my last purchase" per tally, as the server last told us.
+     * The wait itself lives on the server, so closing the app does not stop it; this is
+     * only what the screen shows.
+     */
+    var watches: Map<String, PurchaseWatch> by mutableStateOf(emptyMap())
+        private set
+
+    /** Outcomes the user has closed, so the strip goes back to the button. */
+    private var dismissed: Set<String> by mutableStateOf(emptySet())
+
+    /** The press to show on this tally's screen, if any: a wait, or a recent outcome not yet closed. */
+    fun watchFor(tallyId: String): PurchaseWatch? {
+        val w = watches[tallyId] ?: return null
+        if (w.waiting) return w
+        if (w.status == "cancelled" || w.id in dismissed) return null
+        // An old outcome is history, not news.
+        return if (now() - w.until < OutcomeShownForMs) w else null
+    }
+
+    fun dismissWatch(tallyId: String) {
+        watches[tallyId]?.let { dismissed = dismissed + it.id }
+    }
+
+    fun addLastPurchase(tallyId: String) = followUp(tallyId, "POST")
+
+    fun stopLastPurchase(tallyId: String) = followUp(tallyId, "DELETE")
+
+    /** One GET. The screen calls it on a timer while a wait is on. */
+    suspend fun pollWatch(tallyId: String) {
+        val r = api.lastPurchase(tallyId, "GET")
+        if (r.ok) apply(tallyId, r.watch) // a failed poll is retried by the next tick
+    }
+
+    private fun followUp(tallyId: String, method: String) {
+        scope.launch {
+            val r = api.lastPurchase(tallyId, method)
+            if (r.ok) apply(tallyId, r.watch) else error = r.error ?: "Could not reach the server"
+        }
+    }
+
+    private fun apply(tallyId: String, w: PurchaseWatch?) {
+        val before = watches[tallyId]
+        watches = if (w == null) watches - tallyId else watches + (tallyId to w)
+        // The purchase is now a row on the server: fetch it so it appears in the list.
+        if (w?.status == "added" && (before?.status != "added" || before.id != w.id)) refresh()
+    }
+
     // ---- plumbing ---------------------------------------------------------------
 
     /** A change with nothing to undo: on failure, resync with the server. */
@@ -275,6 +325,7 @@ class TallyStore(private val api: TallyApi, private val scope: CoroutineScope) {
 
     private companion object {
         const val MaxNameLength = 40
+        const val OutcomeShownForMs = 60 * 60_000L
         val CopySuffix = Regex(" copy( \\d+)?$")
     }
 }

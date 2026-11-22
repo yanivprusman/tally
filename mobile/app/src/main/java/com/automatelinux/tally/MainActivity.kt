@@ -1,10 +1,15 @@
 package com.automatelinux.tally
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import com.automatelinux.tally.data.TallyApi
 import com.russhwolf.settings.SharedPreferencesSettings
 
@@ -18,12 +23,20 @@ import com.russhwolf.settings.SharedPreferencesSettings
  * one says so on screen rather than failing quietly.
  */
 class MainActivity : ComponentActivity() {
+    private val askNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    private lateinit var nav: Navigator
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // "Add my last purchase" tells you how it ended with a notification.
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
 
         val api = TallyApi(BuildConfig.API_BASE_URL, BuildConfig.API_TOKEN)
-        val nav = Navigator(SharedPreferencesSettings(getSharedPreferences("navigation", MODE_PRIVATE)))
+        nav = Navigator(SharedPreferencesSettings(getSharedPreferences("navigation", MODE_PRIVATE)))
+        openTallyFrom(intent)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -36,5 +49,20 @@ class MainActivity : ComponentActivity() {
         })
 
         setContent { App(api, nav) }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        openTallyFrom(intent)
+    }
+
+    /** A tapped purchase notification opens the tally it is about. */
+    private fun openTallyFrom(intent: Intent?) {
+        val id = intent?.getStringExtra(PurchasePush.EXTRA_TALLY)?.takeIf { it.isNotBlank() } ?: return
+        intent.removeExtra(PurchasePush.EXTRA_TALLY)
+        val top = nav.current
+        if (top is Route.Detail && top.tallyId == id) return
+        nav.popToHome()
+        nav.go(Route.Detail(id))
     }
 }

@@ -22,6 +22,40 @@ data class TalliesResponse(
     val error: String? = null,
 )
 
+/** What "add my last purchase" put in the tally (server lib/lastPurchase.ts). */
+@Serializable
+data class CardEntry(
+    val id: String,
+    val amount: Long,
+    val note: String = "",
+    val category: String = "other",
+    val at: Long,
+)
+
+/**
+ * One press of "add my last purchase", as the server tracks it. `waiting` with no
+ * checks yet means the first look at the card is still running.
+ */
+@Serializable
+data class PurchaseWatch(
+    val id: String,
+    val tallyId: String,
+    val requestedAt: Long,
+    val status: String,
+    val checks: Int = 0,
+    val error: String? = null,
+    val until: Long,
+    val entry: CardEntry? = null,
+) {
+    val waiting: Boolean get() = status == "waiting"
+}
+
+@Serializable
+data class WatchResponse(val ok: Boolean = false, val watch: PurchaseWatch? = null, val error: String? = null)
+
+@Serializable
+private data class PushBody(val endpoint: String)
+
 @Serializable
 private data class Ack(val ok: Boolean = false, val error: String? = null)
 
@@ -114,6 +148,18 @@ class TallyApi(baseUrl: String, private val token: String) {
     )
 
     suspend fun deleteEntry(id: String): String? = call("DELETE", "/api/entries/$id", null)
+
+    /** "Add my last purchase": POST presses the button, GET follows the press, DELETE stops waiting. */
+    suspend fun lastPurchase(tallyId: String, method: String): WatchResponse {
+        if (!configured) return WatchResponse(error = NO_TOKEN)
+        val r = httpRequest(method, "$base/api/tallies/$tallyId/last-purchase", token, if (method == "POST") "{}" else null)
+        return runCatching { json.decodeFromString(WatchResponse.serializer(), r.body) }
+            .getOrElse { WatchResponse(error = describe(r)) }
+    }
+
+    /** Where the server should push when a wait ends (UnifiedPush, through the suite's ntfy). */
+    suspend fun registerPush(endpoint: String): String? =
+        call("POST", "/api/push/register", json.encodeToString(PushBody.serializer(), PushBody(endpoint)))
 
     /** Null means it worked; anything else is a sentence to put on screen. */
     private suspend fun call(method: String, path: String, body: String?): String? {

@@ -63,6 +63,8 @@ android {
 dependencies {
     // Shared KMP module (commonMain code shared with iOS)
     implementation(project(":shared"))
+    // "Add my last purchase" ends with a push through the suite's ntfy — never Firebase.
+    implementation(libs.unifiedpush.connector)
     implementation(libs.kotlinx.datetime)
     implementation(libs.multiplatform.settings)
 

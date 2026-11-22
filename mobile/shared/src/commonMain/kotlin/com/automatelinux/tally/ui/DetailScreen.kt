@@ -19,14 +19,18 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.CreditCard
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.SouthWest
 import androidx.compose.material.icons.rounded.NorthEast
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,6 +46,7 @@ import com.automatelinux.tally.Navigator
 import com.automatelinux.tally.Route
 import com.automatelinux.tally.data.Direction
 import com.automatelinux.tally.data.Entry
+import com.automatelinux.tally.data.PurchaseWatch
 import com.automatelinux.tally.data.Tally
 import com.automatelinux.tally.data.TallyStore
 import com.automatelinux.tally.data.categoryLabel
@@ -61,6 +66,7 @@ import com.automatelinux.tally.ui.components.TallyMarkArt
 import com.automatelinux.tally.ui.components.categoryIcon
 import com.automatelinux.tally.ui.theme.Num
 import com.automatelinux.tally.ui.theme.T
+import kotlinx.coroutines.delay
 
 @Composable
 fun DetailScreen(store: TallyStore, nav: Navigator, tallyId: String) {
@@ -150,12 +156,35 @@ fun DetailScreen(store: TallyStore, nav: Navigator, tallyId: String) {
             }
         }
 
-        Row(
+        val watch = store.watchFor(tally.id)
+        // Ask how the last press stands when the tally opens (it may have ended while the
+        // app was closed), then keep asking while it waits: often during the first look,
+        // which takes seconds, then at the pace the server itself checks the card.
+        LaunchedEffect(tally.id) { store.pollWatch(tally.id) }
+        LaunchedEffect(tally.id, watch?.id, watch?.waiting) {
+            while (watch?.waiting == true) {
+                delay(if (store.watchFor(tally.id)?.checks == 0) 3_000 else 15_000)
+                store.pollWatch(tally.id)
+            }
+        }
+
+        Column(
             Modifier
                 .fillMaxWidth()
                 .background(T.bg)
                 .navigationBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+        LastPurchaseBar(
+            watch = watch,
+            currency = tally.currency,
+            onPress = { store.addLastPurchase(tally.id) },
+            onStop = { store.stopLastPurchase(tally.id) },
+            onDismiss = { store.dismissWatch(tally.id) },
+        )
+        Row(
+            Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             // Out sits on the left, and the toggle on the amount screen matches it — press
@@ -174,6 +203,7 @@ fun DetailScreen(store: TallyStore, nav: Navigator, tallyId: String) {
                 container = T.incomeSoft,
                 modifier = Modifier.weight(1f),
             ) { nav.go(Route.Amount(tally.id, Direction.IN)) }
+        }
         }
     }
 
@@ -421,6 +451,73 @@ private fun WaitingForTally(loading: Boolean, onBack: () -> Unit) {
             verticalArrangement = Arrangement.Center,
         ) {
             TallyMarkArt(T.textFaint)
+        }
+    }
+}
+
+/**
+ * "Add my last purchase": you pay, you tap, and the card purchase lands in the tally.
+ *
+ * A purchase reaches the card company a few minutes after the payment, so a tap usually
+ * starts a wait. The wait runs on the server — the app can be closed, and a notification
+ * says how it ended — and this strip is only a window onto it.
+ */
+@Composable
+private fun LastPurchaseBar(
+    watch: PurchaseWatch?,
+    currency: String,
+    onPress: () -> Unit,
+    onStop: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    if (watch == null) {
+        Surface(
+            onClick = onPress,
+            shape = RoundedCornerShape(16.dp),
+            color = T.surface,
+            modifier = Modifier.fillMaxWidth().height(46.dp),
+        ) {
+            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.CreditCard, null, Modifier.size(18.dp), tint = T.brand)
+                Spacer(Modifier.width(8.dp))
+                Text("Add my last card purchase", style = MaterialTheme.typography.labelLarge, color = T.brand)
+            }
+        }
+        return
+    }
+
+    val (title, detail, tint) = when {
+        watch.waiting && watch.checks == 0 ->
+            Triple("Looking at your card…", "Takes about 15 seconds", T.brand)
+        watch.waiting ->
+            Triple("Waiting for it to reach the card", "Checks every 2 minutes until ${formatTime(watch.until)} — you can close the app", T.brand)
+        watch.status == "added" && watch.entry != null ->
+            Triple("Added −" + formatMoney(watch.entry.amount, currency), watch.entry.note, T.expense)
+        watch.status == "expired" ->
+            Triple("No new card purchase in 30 minutes", "Cash or Bit never reaches the card — add it by hand", T.textDim)
+        else ->
+            Triple("Could not check the card", watch.error ?: "Unknown error", T.expense)
+    }
+
+    Surface(shape = RoundedCornerShape(16.dp), color = T.surface, modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(start = 14.dp, end = 6.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (watch.waiting) {
+                CircularProgressIndicator(Modifier.size(18.dp), color = T.brand, strokeWidth = 2.dp)
+            } else {
+                Icon(Icons.Rounded.CreditCard, null, Modifier.size(18.dp), tint = tint)
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.labelLarge, color = tint, maxLines = 1)
+                Text(detail, style = MaterialTheme.typography.labelSmall, color = T.textFaint, maxLines = 2)
+            }
+            if (watch.waiting) {
+                Surface(onClick = onStop, shape = RoundedCornerShape(12.dp), color = Color.Transparent) {
+                    Text("Stop", style = MaterialTheme.typography.labelLarge, color = T.textDim, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
+                }
+            } else {
+                RoundIconButton(Icons.Rounded.Close, "Close", onDismiss)
+            }
         }
     }
 }
