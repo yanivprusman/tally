@@ -48,6 +48,22 @@ no exception: nothing links the two afterwards, and deleting either leaves the o
 Entry ids are new — two rows may never share one — but the times are not, so both tallies
 group under identical day headings and read line for line.
 
+## Add my last card purchase
+
+Pay, then tap **Add my last card purchase** at the bottom of a tally. The server asks
+tazrim (`GET /api/card/recent`, which holds the Cal login, so tally never logs in
+itself) and adds the newest card purchase that was made in the last 30 minutes and is
+not in the tally yet: not taken from the card before (`entries.card_ref`), not written
+by hand (same amount, within 5 minutes), and not a later payment of an old installment
+purchase.
+
+A purchase reaches Cal a few minutes after the payment, so a tap usually becomes a
+**wait**: a row in `purchase_watches` that the server checks every 2 minutes for 30
+minutes. It survives a server restart (`instrumentation.ts` resumes it). The phone can be
+closed meanwhile: when the wait ends, the server pushes through the suite's ntfy
+(UnifiedPush, `lib/push.ts`), and the notification opens that tally. Cash and Bit never
+reach the card, so those are still written by hand.
+
 ## Layout
 
 | Path | What it is |
