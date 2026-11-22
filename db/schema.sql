@@ -55,3 +55,32 @@ SET @sql := (SELECT IF(COUNT(*) = 0,
   FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tallies' AND COLUMN_NAME = 'ex_vat');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- "Add my last purchase": an entry taken from the card remembers which card purchase
+-- it was, so the same purchase is never offered twice. Hand-written entries leave it NULL.
+SET @sql := (SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE entries ADD COLUMN card_ref VARCHAR(200) NULL AFTER vat_included',
+    'DO 0')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'entries' AND COLUMN_NAME = 'card_ref');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- One press of "add my last purchase". It lives here, not in the server's memory, so a
+-- server restart while it waits resumes the wait instead of forgetting it.
+CREATE TABLE IF NOT EXISTS purchase_watches (
+  id           VARCHAR(40)  NOT NULL PRIMARY KEY,
+  tally_id     VARCHAR(40)  NOT NULL,
+  requested_at TIMESTAMP    NOT NULL,                 -- UTC, written by the server
+  status       ENUM('waiting','added','expired','failed','cancelled') NOT NULL DEFAULT 'waiting',
+  entry_id     VARCHAR(40)  NULL,
+  checks       INT          NOT NULL DEFAULT 0,
+  error        VARCHAR(255) NULL,
+  KEY idx_tally (tally_id, requested_at),
+  CONSTRAINT fk_watch_tally FOREIGN KEY (tally_id) REFERENCES tallies(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Where to wake the phone (UnifiedPush through the suite's ntfy) when a wait ends.
+CREATE TABLE IF NOT EXISTS push_endpoints (
+  endpoint      VARCHAR(500) NOT NULL PRIMARY KEY,
+  registered_at TIMESTAMP    NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
