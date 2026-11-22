@@ -7,6 +7,8 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.net.Uri
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -35,15 +37,23 @@ import org.unifiedpush.android.connector.data.PushMessage
 object PurchasePush {
     private const val TAG = "PurchasePush"
     private const val INSTANCE = "last-purchase"
-    const val CHANNEL = "last-purchase"
+    // A channel's sound is fixed once created, so a new sound means a new channel id.
+    // The first one used the phone's default sound, which is also WhatsApp's.
+    const val CHANNEL = "last-purchase-chime"
+    private const val OLD_CHANNELS = "last-purchase"
     const val EXTRA_TALLY = "tallyId"
 
     /** Safe on every start: keeps the registration (and the server's copy of the endpoint) current. */
     fun register(context: Context) {
+        val manager = context.getSystemService(NotificationManager::class.java)
+        manager.deleteNotificationChannel(OLD_CHANNELS)
+        // Its own sound, so a purchase landing is never mistaken for a WhatsApp message.
+        val sound = Uri.parse("android.resource://${context.packageName}/${R.raw.purchase_chime}")
         val channel = NotificationChannel(CHANNEL, "Card purchases", NotificationManager.IMPORTANCE_DEFAULT).apply {
             description = "A purchase you asked for was added — or did not arrive"
+            setSound(sound, AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).build())
         }
-        context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        manager.createNotificationChannel(channel)
         UnifiedPush.tryUseCurrentOrDefaultDistributor(context) { ok ->
             if (ok) UnifiedPush.register(context, INSTANCE, "Tally card purchases", null)
             else Log.w(TAG, "No UnifiedPush distributor (ntfy) — outcomes show only inside the app")
