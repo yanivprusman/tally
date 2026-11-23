@@ -1,5 +1,6 @@
 package com.automatelinux.tally.data
 
+import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -92,7 +93,7 @@ class TallyApi(baseUrl: String, private val token: String) {
 
     suspend fun list(): TalliesResponse {
         if (!configured) return TalliesResponse(error = NO_TOKEN)
-        val r = httpRequest("GET", "$base/api/tallies", token, null)
+        val r = send("GET", "$base/api/tallies", null)
         return runCatching { json.decodeFromString(TalliesResponse.serializer(), r.body) }
             .getOrElse { TalliesResponse(error = describe(r)) }
     }
@@ -152,7 +153,7 @@ class TallyApi(baseUrl: String, private val token: String) {
     /** "Add my last purchase": POST presses the button, GET follows the press, DELETE stops waiting. */
     suspend fun lastPurchase(tallyId: String, method: String): WatchResponse {
         if (!configured) return WatchResponse(error = NO_TOKEN)
-        val r = httpRequest(method, "$base/api/tallies/$tallyId/last-purchase", token, if (method == "POST") "{}" else null)
+        val r = send(method, "$base/api/tallies/$tallyId/last-purchase", if (method == "POST") "{}" else null)
         return runCatching { json.decodeFromString(WatchResponse.serializer(), r.body) }
             .getOrElse { WatchResponse(error = describe(r)) }
     }
@@ -164,20 +165,44 @@ class TallyApi(baseUrl: String, private val token: String) {
     /** Null means it worked; anything else is a sentence to put on screen. */
     private suspend fun call(method: String, path: String, body: String?): String? {
         if (!configured) return NO_TOKEN
-        val r = httpRequest(method, "$base$path", token, body)
+        val r = send(method, "$base$path", body)
         val ack = runCatching { json.decodeFromString(Ack.serializer(), r.body) }.getOrNull()
         return if (ack?.ok == true) null else ack?.error ?: describe(r)
     }
 
-    /** The status code alone is useless to someone holding a phone. */
+    /**
+     * One request, waiting out a server that is still waking up.
+     *
+     * An idle dev server is stopped by the daemon, which then holds its port and
+     * answers 503 ("Starting…", Retry-After) while it starts the app again — about
+     * 10–20 s. Tally's own routes never answer 503 (a failed handler is a 500 with
+     * the reason in the body), so a 503 means exactly that state, and the right
+     * response is to wait for it, not to show an error the moment the phone wakes
+     * a sleeping server.
+     */
+    private suspend fun send(method: String, url: String, body: String?): HttpResult {
+        var waitedMs = 0L
+        while (true) {
+            val r = httpRequest(method, url, token, body)
+            if (r.code != 503 || waitedMs >= STARTUP_WAIT_MS) return r
+            delay(STARTUP_POLL_MS)
+            waitedMs += STARTUP_POLL_MS
+        }
+    }
+
+    /** The status code alone is useless to someone holding a phone. Reached only when
+     *  the body is not one of the server's own `{ok, error}` replies. */
     private fun describe(r: HttpResult): String = when (r.code) {
         401 -> "This build is not authorised by the server"
         0 -> "No connection — is the VPN up?"
-        in 500..599 -> "The server could not reach its database"
+        503 -> "The server is still starting — try again in a moment"
+        in 500..599 -> "The server failed (${r.code})"
         else -> "Unexpected reply from the server (${r.code})"
     }
 
     private companion object {
         const val NO_TOKEN = "Built without an API token — rebuild with mobile/.env"
+        const val STARTUP_POLL_MS = 2_000L
+        const val STARTUP_WAIT_MS = 60_000L
     }
 }
