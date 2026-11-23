@@ -84,3 +84,24 @@ CREATE TABLE IF NOT EXISTS push_endpoints (
   endpoint      VARCHAR(500) NOT NULL PRIMARY KEY,
   registered_at TIMESTAMP    NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- An open tally collects: money another app records (a paid work day counted in
+-- countdown) lands in every open tally by itself, until the tally is stopped. Tallies
+-- that existed before this column were not collecting, so the column defaults to 0;
+-- a NEW tally is created open by the server (lib/tallies.ts saveTally).
+SET @sql := (SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE tallies ADD COLUMN is_open TINYINT NOT NULL DEFAULT 0 AFTER ex_vat',
+    'DO 0')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tallies' AND COLUMN_NAME = 'is_open');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- An entry another app put here names what it came from ("countdown:<tickId>"), so
+-- saving that thing again updates the one entry instead of adding a second, and
+-- removing it there removes it here. Hand-written entries leave it NULL.
+SET @sql := (SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE entries ADD COLUMN source_ref VARCHAR(200) NULL AFTER card_ref, ADD UNIQUE KEY uq_source (tally_id, source_ref)',
+    'DO 0')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'entries' AND COLUMN_NAME = 'source_ref');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

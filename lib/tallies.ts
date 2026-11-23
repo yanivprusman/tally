@@ -22,6 +22,8 @@ export type Entry = {
   at: number;
   /** VAT sits inside `amount`. The amount itself is always what was paid. */
   vatIncluded: boolean;
+  /** Set when another app put this entry here ("countdown:<tickId>"), see lib/feed.ts. */
+  sourceRef?: string | null;
 };
 
 export type Tally = {
@@ -31,6 +33,8 @@ export type Tally = {
   accent: number;
   /** Show this tally with VAT taken back out of the entries that carry it. */
   exVat: boolean;
+  /** Collecting: money other apps record lands here by itself (lib/feed.ts) until stopped. */
+  open: boolean;
   createdAt: number;
   entries: Entry[];
 };
@@ -44,14 +48,14 @@ const sqlTime = (epochMs: number) => new Date(epochMs).toISOString().slice(0, 19
 
 export async function listTallies(): Promise<Tally[]> {
   const tallies = await q<{
-    id: string; name: string; currency: string; accent: number; ex_vat: number; created_at: string;
-  }>(`SELECT id, name, currency, accent, ex_vat, created_at FROM tallies ORDER BY created_at`);
+    id: string; name: string; currency: string; accent: number; ex_vat: number; is_open: number; created_at: string;
+  }>(`SELECT id, name, currency, accent, ex_vat, is_open, created_at FROM tallies ORDER BY created_at`);
   if (tallies.length === 0) return [];
 
   const rows = await q<{
     id: string; tally_id: string; direction: Direction; amount: number;
-    note: string; category: string; at: string; vat_included: number;
-  }>(`SELECT id, tally_id, direction, amount, note, category, at, vat_included
+    note: string; category: string; at: string; vat_included: number; source_ref: string | null;
+  }>(`SELECT id, tally_id, direction, amount, note, category, at, vat_included, source_ref
         FROM entries WHERE tally_id IN (${tallies.map(() => "?").join(",")}) ORDER BY at`,
     tallies.map((t) => t.id));
 
@@ -66,6 +70,7 @@ export async function listTallies(): Promise<Tally[]> {
       category: r.category,
       at: ms(r.at),
       vatIncluded: Boolean(r.vat_included),
+      sourceRef: r.source_ref,
     });
     byTally.set(r.tally_id, list);
   }
@@ -76,6 +81,7 @@ export async function listTallies(): Promise<Tally[]> {
     currency: t.currency,
     accent: Number(t.accent),
     exVat: Boolean(t.ex_vat),
+    open: Boolean(t.is_open),
     createdAt: ms(t.created_at),
     entries: byTally.get(t.id) ?? [],
   }));
@@ -86,30 +92,34 @@ export async function listTallies(): Promise<Tally[]> {
  * original ids and timestamps. That second form is what Undo uses, so an undone
  * delete restores the tally exactly as it was rather than as a fresh one dated
  * today. Idempotent, so a retried undo is harmless.
+ *
+ * A new tally is open (collecting) unless the caller says otherwise — starting a tally
+ * is starting to count. Undo sends the `open` it had, so it comes back as it was.
  */
 export async function saveTally(
-  t: { id: string; name: string; currency: string; accent: number; exVat: boolean; createdAt: number },
+  t: { id: string; name: string; currency: string; accent: number; exVat: boolean; open?: boolean; createdAt: number },
   entries?: Entry[],
 ) {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
     await conn.query(
-      `INSERT INTO tallies (id, name, currency, accent, ex_vat, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+      `INSERT INTO tallies (id, name, currency, accent, ex_vat, is_open, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE name = VALUES(name), currency = VALUES(currency),
                                accent = VALUES(accent), ex_vat = VALUES(ex_vat)`,
-      [t.id, t.name.slice(0, 64), t.currency, t.accent, t.exVat ? 1 : 0, sqlTime(t.createdAt)],
+      [t.id, t.name.slice(0, 64), t.currency, t.accent, t.exVat ? 1 : 0, t.open === false ? 0 : 1,
+       sqlTime(t.createdAt)],
     );
     for (const e of entries ?? []) {
       await conn.query(
-        `INSERT INTO entries (id, tally_id, direction, amount, note, category, at, vat_included)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO entries (id, tally_id, direction, amount, note, category, at, vat_included, source_ref)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE direction = VALUES(direction), amount = VALUES(amount),
                                  note = VALUES(note), category = VALUES(category), at = VALUES(at),
-                                 vat_included = VALUES(vat_included)`,
+                                 vat_included = VALUES(vat_included), source_ref = VALUES(source_ref)`,
         [e.id, t.id, e.direction, Math.round(e.amount), String(e.note).slice(0, 255),
-         e.category, sqlTime(e.at), e.vatIncluded ? 1 : 0],
+         e.category, sqlTime(e.at), e.vatIncluded ? 1 : 0, e.sourceRef ? String(e.sourceRef).slice(0, 200) : null],
       );
     }
     await conn.commit();
@@ -126,6 +136,11 @@ export async function updateTally(id: string, t: {
 }) {
   await exec(`UPDATE tallies SET name = ?, currency = ?, accent = ?, ex_vat = ? WHERE id = ?`,
     [t.name.slice(0, 64), t.currency, t.accent, t.exVat ? 1 : 0, id]);
+}
+
+/** Start or stop collecting. Stopping keeps everything already collected. */
+export async function setTallyOpen(id: string, open: boolean) {
+  await exec(`UPDATE tallies SET is_open = ? WHERE id = ?`, [open ? 1 : 0, id]);
 }
 
 /** Gone. The foreign key takes its entries with it. */

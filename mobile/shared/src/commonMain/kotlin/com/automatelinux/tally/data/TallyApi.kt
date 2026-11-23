@@ -68,6 +68,9 @@ private data class TallyBody(
 )
 
 @Serializable
+private data class OpenBody(val open: Boolean)
+
+@Serializable
 private data class EntryBody(
     val id: String,
     val direction: Direction,
@@ -121,6 +124,10 @@ class TallyApi(baseUrl: String, private val token: String) {
         "PATCH", "/api/tallies/$id",
         json.encodeToString(TallyBody.serializer(), TallyBody(id, name, currency, accent, exVat)),
     )
+
+    /** Start or stop collecting. Sent alone, so it cannot overwrite the tally's settings. */
+    suspend fun setOpen(id: String, open: Boolean): String? =
+        call("PATCH", "/api/tallies/$id", json.encodeToString(OpenBody.serializer(), OpenBody(open)))
 
     suspend fun deleteTally(id: String): String? = call("DELETE", "/api/tallies/$id", null)
 

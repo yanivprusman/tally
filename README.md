@@ -101,3 +101,21 @@ adb shell am start -n com.automatelinux.tally.dev/com.automatelinux.tally.MainAc
 The web side is managed by the daemon like any other app: `d startApp --app tally`
 (dev 3141, prod 3140). Schema changes go in `db/schema.sql` and are applied with
 `sudo mysql tally < db/schema.sql` — it is written to be re-runnable.
+
+## Open tallies collect from other apps
+
+A tally can be **open** (⋮ → *Collect work days* / *Stop collecting*; an open card wears an
+"open" badge). A new tally starts open; a duplicate never is. While a tally is open, money
+other apps record lands in it by itself:
+
+- **countdown**: a counted work day that says what it paid ("600 plus VAT") is written to
+  every open tally as income, category *work*, gross with VAT inside (708) — the tally's
+  Ex. VAT view shows 600. Same day goes to tazrim, keyed the same way.
+
+The source owns the entry (`entries.source_ref`, e.g. `countdown:<tickId>`). The first save
+adds it to every tally open *at that moment*; later saves (an edit, an undo) update only the
+tallies that already hold it, open or stopped, so correcting last week's day fixes last
+week's tally rather than dropping a copy into this week's. Removing the day removes it here.
+
+Other apps write through `PUT /api/feed` / `DELETE /api/feed?ref=` (same bearer token) —
+see `lib/feed.ts`. A PUT that finds no open tally is not an error; it lands nowhere.

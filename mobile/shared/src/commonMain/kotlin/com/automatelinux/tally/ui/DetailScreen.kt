@@ -95,7 +95,7 @@ fun DetailScreen(store: TallyStore, nav: Navigator, tallyId: String) {
                 0 -> "No entries yet"
                 1 -> "1 entry"
                 else -> "${tally.entries.size} entries"
-            },
+            } + if (tally.open) " · open, collecting work days" else "",
             onBack = { nav.back() },
         ) {
             Box {
@@ -110,6 +110,8 @@ fun DetailScreen(store: TallyStore, nav: Navigator, tallyId: String) {
                         menuOpen = false
                         store.duplicateTally(tally.id)?.let { nav.go(Route.Detail(it)) }
                     },
+                    open = tally.open,
+                    onToggleOpen = { menuOpen = false; store.setOpen(tally.id, !tally.open) },
                     onReset = { menuOpen = false; confirmReset = true },
                     onDelete = { menuOpen = false; confirmDelete = true },
                 )

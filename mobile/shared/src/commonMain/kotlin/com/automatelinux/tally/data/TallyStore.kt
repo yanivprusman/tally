@@ -81,7 +81,8 @@ class TallyStore(private val api: TallyApi, private val scope: CoroutineScope) {
     // ---- tallies ----------------------------------------------------------------
 
     fun createTally(name: String, currency: String, accent: Int): String {
-        val t = Tally(id = newId(), name = name.trim(), currency = currency, accent = accent, createdAt = now())
+        // A new tally starts collecting — the server creates it open too.
+        val t = Tally(id = newId(), name = name.trim(), currency = currency, accent = accent, open = true, createdAt = now())
         tallies = tallies + t
         push { api.createTally(t.id, t.name, t.currency, t.accent, t.createdAt) }
         return t.id
@@ -108,7 +109,10 @@ class TallyStore(private val api: TallyApi, private val scope: CoroutineScope) {
             id = newId(),
             name = copyName(source.name),
             createdAt = now(),
-            entries = source.entries.map { it.copy(id = newId()) },
+            // A copy is a what-if: it does not collect, and its entries belong to it
+            // alone, so editing a work day in countdown changes only the original.
+            open = false,
+            entries = source.entries.map { it.copy(id = newId(), sourceRef = null) },
         )
         tallies = tallies + copy
         push { api.saveTally(copy) }
@@ -134,6 +138,13 @@ class TallyStore(private val api: TallyApi, private val scope: CoroutineScope) {
         val t = tally(id) ?: return
         tallies = tallies.map { if (it.id == id) it.copy(exVat = on) else it }
         push { api.updateTally(id, t.name, t.currency, t.accent, on) }
+    }
+
+    /** Start or stop collecting work days from the other apps. */
+    fun setOpen(id: String, open: Boolean) {
+        tally(id) ?: return
+        tallies = tallies.map { if (it.id == id) it.copy(open = open) else it }
+        push { api.setOpen(id, open) }
     }
 
     fun resetTally(id: String) {

@@ -20,6 +20,9 @@ data class Entry(
     val at: Long,
     /** VAT sits inside `amount`. What was paid is what is stored, either way — see Vat.kt. */
     val vatIncluded: Boolean = false,
+    /** Set when another app put this entry here (a paid countdown work day). The source
+     *  owns it: editing or removing the day there changes it here. */
+    val sourceRef: String? = null,
 )
 
 /**
@@ -34,6 +37,8 @@ data class Tally(
     val accent: Int = 0,
     /** Show the amounts with VAT taken back out of the entries that carry it. */
     val exVat: Boolean = false,
+    /** Collecting: money other apps record (paid work days) lands here by itself until stopped. */
+    val open: Boolean = false,
     val createdAt: Long,
     val entries: List<Entry> = emptyList(),
 ) {

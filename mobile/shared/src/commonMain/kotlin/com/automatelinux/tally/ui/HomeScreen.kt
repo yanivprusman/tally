@@ -23,6 +23,8 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.PauseCircleOutline
+import androidx.compose.material.icons.rounded.PlayCircleOutline
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.DropdownMenu
@@ -101,6 +103,7 @@ fun HomeScreen(store: TallyStore, nav: Navigator) {
                             onDuplicate = {
                                 store.duplicateTally(tally.id)?.let { nav.go(Route.Detail(it)) }
                             },
+                            onToggleOpen = { store.setOpen(tally.id, !tally.open) },
                             onReset = { confirmReset = tally },
                             onDelete = { confirmDelete = tally },
                         )
@@ -151,6 +154,7 @@ private fun TallyCard(
     onOpen: () -> Unit,
     onEdit: () -> Unit,
     onDuplicate: () -> Unit,
+    onToggleOpen: () -> Unit,
     onReset: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -174,6 +178,10 @@ private fun TallyCard(
                     maxLines = 1,
                     modifier = Modifier.weight(1f),
                 )
+                if (tally.open) {
+                    OpenBadge()
+                    Spacer(Modifier.width(4.dp))
+                }
                 Box {
                     RoundIconButton(Icons.Rounded.MoreVert, "More", { menuOpen = true })
                     TallyMenu(
@@ -181,6 +189,8 @@ private fun TallyCard(
                         onDismiss = { menuOpen = false },
                         onEdit = { menuOpen = false; onEdit() },
                         onDuplicate = { menuOpen = false; onDuplicate() },
+                        open = tally.open,
+                        onToggleOpen = { menuOpen = false; onToggleOpen() },
                         onReset = { menuOpen = false; onReset() },
                         onDelete = { menuOpen = false; onDelete() },
                     )
@@ -228,6 +238,20 @@ private fun TallyCard(
     }
 }
 
+/** "Open": paid work days counted in countdown land in this tally by themselves. */
+@Composable
+fun OpenBadge() {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.clip(RoundedCornerShape(50)).background(T.income.copy(alpha = 0.14f))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    ) {
+        Box(Modifier.size(6.dp).clip(CircleShape).background(T.income))
+        Spacer(Modifier.width(5.dp))
+        Text("open", style = MaterialTheme.typography.labelMedium, color = T.income)
+    }
+}
+
 @Composable
 private fun Flow(label: String, value: String, color: androidx.compose.ui.graphics.Color) {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -245,6 +269,8 @@ fun TallyMenu(
     onDismiss: () -> Unit,
     onEdit: () -> Unit,
     onDuplicate: () -> Unit,
+    open: Boolean,
+    onToggleOpen: () -> Unit,
     onReset: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -256,6 +282,8 @@ fun TallyMenu(
     ) {
         MenuRow("Rename & style", Icons.Rounded.Tune, T.text, onEdit)
         MenuRow("Duplicate tally", Icons.Rounded.ContentCopy, T.text, onDuplicate)
+        if (open) MenuRow("Stop collecting", Icons.Rounded.PauseCircleOutline, T.text, onToggleOpen)
+        else MenuRow("Collect work days", Icons.Rounded.PlayCircleOutline, T.text, onToggleOpen)
         MenuRow("Reset to zero", Icons.Rounded.Restore, T.text, onReset)
         MenuRow("Delete tally", Icons.Rounded.DeleteOutline, T.expense, onDelete)
     }
