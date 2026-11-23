@@ -178,10 +178,9 @@ fun DetailScreen(store: TallyStore, nav: Navigator, tallyId: String) {
                 .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-        LastPurchaseBar(
+        if (watch != null) LastPurchaseBar(
             watch = watch,
             currency = tally.currency,
-            onPress = { store.addLastPurchase(tally.id) },
             onStop = { store.stopLastPurchase(tally.id) },
             onDismiss = { store.dismissWatch(tally.id) },
         )
@@ -458,7 +457,8 @@ private fun WaitingForTally(loading: Boolean, onBack: () -> Unit) {
 }
 
 /**
- * "Add my last purchase": you pay, you tap, and the card purchase lands in the tally.
+ * "From my card" (on the Money out screen): you pay, you tap, and the card purchase lands
+ * in the tally. This strip appears only once that has been pressed.
  *
  * A purchase reaches the card company a few minutes after the payment, so a tap usually
  * starts a wait. The wait runs on the server — the app can be closed, and a notification
@@ -466,27 +466,11 @@ private fun WaitingForTally(loading: Boolean, onBack: () -> Unit) {
  */
 @Composable
 private fun LastPurchaseBar(
-    watch: PurchaseWatch?,
+    watch: PurchaseWatch,
     currency: String,
-    onPress: () -> Unit,
     onStop: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    if (watch == null) {
-        Surface(
-            onClick = onPress,
-            shape = RoundedCornerShape(16.dp),
-            color = T.surface,
-            modifier = Modifier.fillMaxWidth().height(46.dp),
-        ) {
-            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.CreditCard, null, Modifier.size(18.dp), tint = T.brand)
-                Spacer(Modifier.width(8.dp))
-                Text("Add my last card purchase", style = MaterialTheme.typography.labelLarge, color = T.brand)
-            }
-        }
-        return
-    }
 
     val (title, detail, tint) = when {
         watch.waiting && watch.checks == 0 ->

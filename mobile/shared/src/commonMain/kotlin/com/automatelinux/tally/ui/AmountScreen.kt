@@ -28,6 +28,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.CreditCard
 import androidx.compose.material.icons.rounded.NorthEast
 import androidx.compose.material.icons.rounded.Percent
 import androidx.compose.material.icons.rounded.SouthWest
@@ -118,7 +119,25 @@ fun AmountScreen(
             title = tally.name,
             subtitle = if (existing == null) "New entry" else "Edit entry",
             onBack = { nav.back() },
-        )
+        ) {
+            // The card pull is a way of adding money out, so it lives where money out is
+            // added — not as a permanent strip on the tally. Starting it goes back to the
+            // tally, where the strip follows the wait until it ends.
+            if (existing == null && direction == Direction.OUT && store.watchFor(tally.id)?.waiting != true) {
+                Surface(
+                    onClick = { store.addLastPurchase(tally.id); nav.back() },
+                    shape = RoundedCornerShape(14.dp),
+                    color = T.surface,
+                    modifier = Modifier.padding(end = 8.dp),
+                ) {
+                    Row(Modifier.padding(horizontal = 12.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.CreditCard, null, Modifier.size(17.dp), tint = T.brand)
+                        Spacer(Modifier.width(6.dp))
+                        Text("From my card", style = MaterialTheme.typography.labelLarge, color = T.brand)
+                    }
+                }
+            }
+        }
 
         Column(Modifier.padding(horizontal = 16.dp).weight(1f)) {
             DirectionToggle(direction) { picked ->
