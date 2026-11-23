@@ -9,7 +9,7 @@ import { q, exec } from "@/lib/db";
  */
 
 export type PushMessage = {
-  kind: "purchase-added" | "purchase-missing";
+  kind: "purchase-added" | "purchase-missing" | "purchase-collected";
   tallyId: string;
   title: string;
   body: string;

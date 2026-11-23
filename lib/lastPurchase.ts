@@ -29,7 +29,7 @@ const SAME_TIME_MS = 5 * 60_000;
 const CHECK_EVERY_MS = 2 * 60_000;
 const WAIT_FOR_MS = 30 * 60_000;
 
-type CardPurchase = {
+export type CardPurchase = {
   date: string;
   amount: number;
   description: string;
@@ -58,10 +58,10 @@ const ms = (s: string) => new Date(s.replace(" ", "T") + "Z").getTime();
 const sqlTime = (epochMs: number) => new Date(epochMs).toISOString().slice(0, 19).replace("T", " ");
 const newId = () => Date.now().toString(36) + "-" + randomBytes(4).toString("hex").slice(0, 5);
 
-const refOf = (p: CardPurchase) => `${p.date}|${p.amount.toFixed(2)}|${p.description}`.slice(0, 200);
+export const refOf = (p: CardPurchase) => `${p.date}|${p.amount.toFixed(2)}|${p.description}`.slice(0, 200);
 
 /** Cal's categories onto tally's buckets (mobile/.../data/Models.kt ExpenseCategories). */
-const CATEGORY: Record<string, string> = {
+export const CATEGORY: Record<string, string> = {
   "מזון ומשקאות": "food",
   "מזון מהיר": "food",
   "מסעדות": "food",
@@ -90,7 +90,7 @@ function tazrimUrl(): string {
 }
 
 /** tazrim's answer, or a thrown error that says what went wrong in words. */
-async function cardPurchases(): Promise<CardPurchase[]> {
+export async function cardPurchases(): Promise<CardPurchase[]> {
   const res = await fetch(`${tazrimUrl()}/api/card/recent`, { signal: AbortSignal.timeout(150_000) });
   // An idle tazrim dev server answers with a "Starting…" page while it boots.
   if (res.status === 503) throw new Error("tazrim is starting up");

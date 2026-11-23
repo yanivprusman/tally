@@ -119,3 +119,10 @@ week's tally rather than dropping a copy into this week's. Removing the day remo
 
 Other apps write through `PUT /api/feed` / `DELETE /api/feed?ref=` (same bearer token) —
 see `lib/feed.ts`. A PUT that finds no open tally is not an error; it lands nowhere.
+- **The card**: while a tally is open, `tally-card-collect.timer` (every 20 min, 07:00–23:40)
+  wakes `POST /api/feed/card`, which asks tazrim for the card's recent purchases and adds
+  every new one made since the tally was opened (`tallies.opened_at`) — skipping
+  installment payments 2+, purchases already taken from the card, and ones typed in by hand
+  (same amount within 12 h). Each addition wakes the phone. With no tally open, Cal is
+  not touched. Units: `deploy/tally-card-collect.{service,timer}`, copied (not linked)
+  into `/etc/systemd/system`.

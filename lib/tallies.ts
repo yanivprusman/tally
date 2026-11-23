@@ -104,12 +104,12 @@ export async function saveTally(
   try {
     await conn.beginTransaction();
     await conn.query(
-      `INSERT INTO tallies (id, name, currency, accent, ex_vat, is_open, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO tallies (id, name, currency, accent, ex_vat, is_open, opened_at, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE name = VALUES(name), currency = VALUES(currency),
                                accent = VALUES(accent), ex_vat = VALUES(ex_vat)`,
       [t.id, t.name.slice(0, 64), t.currency, t.accent, t.exVat ? 1 : 0, t.open === false ? 0 : 1,
-       sqlTime(t.createdAt)],
+       t.open === false ? null : sqlTime(t.createdAt), sqlTime(t.createdAt)],
     );
     for (const e of entries ?? []) {
       await conn.query(
@@ -140,7 +140,11 @@ export async function updateTally(id: string, t: {
 
 /** Start or stop collecting. Stopping keeps everything already collected. */
 export async function setTallyOpen(id: string, open: boolean) {
-  await exec(`UPDATE tallies SET is_open = ? WHERE id = ?`, [open ? 1 : 0, id]);
+  // Opening (again) restarts the clock card purchases are collected from: what was
+  // bought while the tally was stopped is not collected afterwards.
+  if (open) await exec(`UPDATE tallies SET is_open = 1, opened_at = ? WHERE id = ? AND is_open = 0`,
+    [sqlTime(Date.now()), id]);
+  else await exec(`UPDATE tallies SET is_open = 0 WHERE id = ?`, [id]);
 }
 
 /** Gone. The foreign key takes its entries with it. */

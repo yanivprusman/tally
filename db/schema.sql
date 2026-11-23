@@ -105,3 +105,13 @@ SET @sql := (SELECT IF(COUNT(*) = 0,
   FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'entries' AND COLUMN_NAME = 'source_ref');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- When the tally last became open. Card purchases made from then on are collected into
+-- it automatically (lib/cardCollect.ts); earlier ones are not — opening a tally is not a
+-- request to backfill the week.
+SET @sql := (SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE tallies ADD COLUMN opened_at TIMESTAMP NULL AFTER is_open',
+    'DO 0')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tallies' AND COLUMN_NAME = 'opened_at');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

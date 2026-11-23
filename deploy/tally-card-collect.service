@@ -1,0 +1,12 @@
+[Unit]
+Description=tally: add new card purchases to the open tallies
+After=tally-dev.service network-online.target
+
+[Service]
+Type=oneshot
+# The pass lives in the app (lib/cardCollect.ts); this only wakes it. The token is
+# read from the app's own .env.local, so the unit holds no secret.
+EnvironmentFile=/opt/dev/tally/.env.local
+# An evicted dev server comes back on the first connect (PortGuardian answers 503 while
+# it starts), so a refused first try waits and asks again.
+ExecStart=/bin/sh -c 'for i in 1 2 3 4 5 6; do out=$(/usr/bin/curl -sS -m 300 -X POST -H "authorization: Bearer $TALLY_API_TOKEN" -w "\n%%{http_code}" http://127.0.0.1:3141/api/feed/card) || out="\n000"; code=$(printf "%%s" "$out" | tail -n1); printf "%%s\n" "$out" | head -n -1; [ "$code" = 200 ] && exit 0; [ "$code" = 503 ] || [ "$code" = 000 ] || exit 1; sleep 30; done; exit 1'

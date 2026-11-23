@@ -1,0 +1,11 @@
+[Unit]
+Description=tally card collection, every 20 minutes from 07:00 to 23:40
+
+[Timer]
+# By day only: each pass with a tally open is a Cal login, and night purchases are
+# still collected by the 07:00 pass (anything since the tally was opened counts).
+OnCalendar=*-*-* 07..23:00/20
+Persistent=false
+
+[Install]
+WantedBy=timers.target
